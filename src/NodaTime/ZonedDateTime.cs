@@ -70,6 +70,44 @@ namespace NodaTime
         }
 
         /// <summary>
+        /// TMF - Added
+        /// </summary>
+        /// <param name="zone"></param>
+        /// <param name="year"></param>
+        /// <param name="month"></param>
+        /// <param name="day"></param>
+        /// <param name="hour"></param>
+        /// <param name="minute"></param>
+        /// <param name="second"></param>
+        /// <param name="millisecond"></param>
+        /// <param name="tickWithinMillisecond"></param>
+        public ZonedDateTime(DateTimeZone zone, int year = 0, int month = 0, int day = 0, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int tickWithinMillisecond = 0)
+            : this(zone, CalendarSystem.Iso, year, month, day, hour, minute, second, millisecond, tickWithinMillisecond)
+        {
+        }
+
+        /// <summary>
+        /// TMF - Added
+        /// </summary>
+        /// <param name="zone"></param>
+        /// <param name="calendar"></param>
+        /// <param name="year"></param>
+        /// <param name="month"></param>
+        /// <param name="day"></param>
+        /// <param name="hour"></param>
+        /// <param name="minute"></param>
+        /// <param name="second"></param>
+        /// <param name="millisecond"></param>
+        /// <param name="tickWithinMillisecond"></param>
+        public ZonedDateTime(DateTimeZone zone, [NotNull] CalendarSystem calendar, int year = 0, int month = 0, int day = 0, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int tickWithinMillisecond = 0)
+            : this()
+        {
+            this.zone = zone;
+            this.localDateTime = new LocalDateTime(year, month, day, hour, minute, second, millisecond, tickWithinMillisecond, calendar);
+            this.offset = zone.MapLocal(localDateTime).Single().Offset;
+        }
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="ZonedDateTime"/> struct.
         /// </summary>
         /// <param name="instant">The instant.</param>

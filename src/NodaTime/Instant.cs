@@ -4,6 +4,7 @@
 
 using System;
 using System.Globalization;
+using System.Runtime.InteropServices.ComTypes;
 using System.Runtime.Serialization;
 using System.Xml;
 using System.Xml.Schema;
@@ -395,6 +396,29 @@ namespace NodaTime
         public static Instant FromUtc(int year, int monthOfYear, int dayOfMonth, int hourOfDay, int minuteOfHour, int secondOfMinute)
         {
             var local = CalendarSystem.Iso.GetLocalInstant(year, monthOfYear, dayOfMonth, hourOfDay, minuteOfHour, secondOfMinute);
+            return new Instant(local.Ticks);
+        }
+
+        /// <summary>
+        /// Returns a new instant corresponding to the given UTC date and
+        /// time in the ISO calendar. In most cases applications should 
+        /// use <see cref="ZonedDateTime" />
+        /// to represent a date and time, but this method is useful in some 
+        /// situations where an Instant is required, such as time zone testing.
+        /// </summary>
+        /// <param name="year">The year. This is the "absolute year",
+        /// so a value of 0 means 1 BC, for example.</param>
+        /// <param name="monthOfYear">The month of year.</param>
+        /// <param name="dayOfMonth">The day of month.</param>
+        /// <param name="hourOfDay">The hour.</param>
+        /// <param name="minuteOfHour">The minute.</param>
+        /// <param name="secondOfMinute">The second.</param>
+        /// <param name="millisecondOfSecond">Millisecond within the second</param>
+        /// <param name="tickOfMillisecond">Tick within the millisecond</param>
+        /// <returns>An <see cref="Instant"/> value representing the given date and time in UTC and the ISO calendar.</returns>
+        public static Instant FromUtc(int year, int monthOfYear, int dayOfMonth, int hourOfDay, int minuteOfHour, int secondOfMinute, int millisecondOfSecond, int tickOfMillisecond)
+        {
+            var local = CalendarSystem.Iso.GetLocalInstant(year, monthOfYear, dayOfMonth, hourOfDay, minuteOfHour, secondOfMinute, millisecondOfSecond, tickOfMillisecond);
             return new Instant(local.Ticks);
         }
 
