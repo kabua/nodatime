@@ -372,6 +372,17 @@ namespace NodaTime
         }
 
         /// <summary>
+        /// Returns the <see cref="TimeSpan"/> between one <see cref="LocalTime"/> and another <see cref="LocalTime"/>
+        /// </summary>
+        /// <param name="lhs">The left hand side of the operator</param>
+        /// <param name="rhs">The right hand side of the operator</param>
+        /// <returns>The <see cref="TimeSpan"/></returns>
+        public static TimeSpan operator -(LocalDate lhs, LocalDate rhs)
+        {
+            return lhs.AtMidnight() - rhs.AtMidnight();
+        }
+
+        /// <summary>
         /// Indicates whether this date is earlier, later or the same as another one.
         /// </summary>
         /// <remarks>

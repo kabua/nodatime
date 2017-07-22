@@ -344,6 +344,11 @@ namespace NodaTime
         public long TickOfDay { get { return Calendar.GetTickOfDay(localInstant); } }
 
         /// <summary>
+        /// Get the total ticks that represent this specific <see cref="LocalDateTime"/>.
+        /// </summary>
+        public long TotalTicks { get { return LocalInstant.Ticks; } }
+
+        /// <summary>
         /// Gets the time portion of this local date and time as a <see cref="LocalTime"/>.
         /// </summary>
         public LocalTime TimeOfDay { get { return new LocalTime(TickOfDay); } }
@@ -605,6 +610,17 @@ namespace NodaTime
         {
             Preconditions.CheckNotNull(period, "period");
             return new LocalDateTime(period.AddTo(localInstant, Calendar, -1), Calendar);
+        }
+
+        /// <summary>
+        /// Returns the <see cref="TimeSpan"/> between one <see cref="LocalDateTime"/> and another <see cref="LocalDateTime"/>
+        /// </summary>
+        /// <param name="lhs">The left hand side of the operator</param>
+        /// <param name="rhs">The right hand side of the operator</param>
+        /// <returns>The <see cref="TimeSpan"/></returns>
+        public static TimeSpan operator -(LocalDateTime lhs, LocalDateTime rhs)
+        {
+            return lhs.InUtc() - rhs.InUtc();
         }
         #endregion
 

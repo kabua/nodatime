@@ -392,6 +392,19 @@ namespace NodaTime
         }
 
         /// <summary>
+        /// Returns the <see cref="TimeSpan"/> between one <see cref="LocalTime"/> and another <see cref="LocalTime"/>
+        /// </summary>
+        /// <param name="lhs">The left hand side of the operator</param>
+        /// <param name="rhs">The right hand side of the operator</param>
+        /// <returns>The <see cref="TimeSpan"/></returns>
+        public static TimeSpan operator -(LocalTime lhs, LocalTime rhs)
+        {
+            // I believe we must swap lhs and rhs to use Between correctly.
+            //
+            return Period.Between(rhs, lhs, PeriodUnits.AllTimeUnits).ToDuration().ToTimeSpan();
+        }
+
+        /// <summary>
         /// Indicates whether this time is earlier, later or the same as another one.
         /// </summary>
         /// <param name="other">The other date/time to compare this one with</param>

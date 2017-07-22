@@ -301,6 +301,11 @@ namespace NodaTime
         public long TickOfDay { get { return LocalDateTime.TickOfDay; } }
 
         /// <summary>
+        /// Get the total ticks that represent this specific <see cref="ZonedDateTime"/>.
+        /// </summary>
+        public long TotalTicks { get { return LocalDateTime.TotalTicks; } }
+
+        /// <summary>
         /// Converts this value to the instant it represents on the time line.
         /// </summary>
         /// <remarks>
@@ -538,7 +543,6 @@ namespace NodaTime
             return this + duration;
         }
 
-
         /// <summary>
         /// Subtracts a duration from a zoned date and time. Friendly alternative to <c>operator-()</c>.
         /// </summary>
@@ -574,6 +578,17 @@ namespace NodaTime
         public static ZonedDateTime operator -(ZonedDateTime zonedDateTime, Duration duration)
         {
             return new ZonedDateTime(zonedDateTime.ToInstant() - duration, zonedDateTime.Zone, zonedDateTime.LocalDateTime.Calendar);
+        }
+
+        /// <summary>
+        /// Returns the <see cref="TimeSpan"/> between one <see cref="ZonedDateTime"/> and another <see cref="ZonedDateTime"/>
+        /// </summary>
+        /// <param name="lhs">The left hand side of the operator</param>
+        /// <param name="rhs">The right hand side of the operator</param>
+        /// <returns>The <see cref="TimeSpan"/></returns>
+        public static TimeSpan operator -(ZonedDateTime lhs, ZonedDateTime rhs)
+        {
+            return (lhs.ToInstant() - rhs.ToInstant()).ToTimeSpan();
         }
         #endregion
 

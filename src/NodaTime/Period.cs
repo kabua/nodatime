@@ -566,6 +566,17 @@ namespace NodaTime
         }
 
         /// <summary>
+        /// Returns a <see cref="TimeSpan"/> that represents the same number of "Standard" ticks as this
+        /// <see cref="Period"/>.
+        /// </summary>
+        /// <returns>A new TimeSpan with the same number of  "Standard" ticks as this Period.</returns>
+        [Pure]
+        public TimeSpan ToTimeSpan()
+        {
+            return ToDuration().ToTimeSpan();
+        }
+
+        /// <summary>
         /// Gets the total number of ticks duration for the 'standard' properties (all bar years and months).
         /// </summary>
         private long TotalStandardTicks
