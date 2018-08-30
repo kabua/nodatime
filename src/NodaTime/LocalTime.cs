@@ -2,19 +2,18 @@
 // Use of this source code is governed by the Apache License 2.0,
 // as found in the LICENSE.txt file.
 
-using static NodaTime.NodaConstants;
-
-using System;
-using System.Globalization;
-using System.Runtime.Serialization;
-using System.Xml;
-using System.Xml.Schema;
-using System.Xml.Serialization;
 using JetBrains.Annotations;
 using NodaTime.Annotations;
 using NodaTime.Fields;
 using NodaTime.Text;
 using NodaTime.Utility;
+using System;
+using System.Globalization;
+using System.Runtime.CompilerServices;
+using System.Xml;
+using System.Xml.Schema;
+using System.Xml.Serialization;
+using static NodaTime.NodaConstants;
 
 namespace NodaTime
 {
@@ -26,13 +25,7 @@ namespace NodaTime
     /// to a particular calendar, time zone or date.
     /// </summary>
     /// <threadsafety>This type is an immutable value type. See the thread safety section of the user guide for more information.</threadsafety>
-#if !PCL
-    [Serializable]
-#endif
-    public struct LocalTime : IEquatable<LocalTime>, IComparable<LocalTime>, IFormattable, IComparable, IXmlSerializable
-#if !PCL
-        , ISerializable
-#endif
+    public readonly struct LocalTime : IEquatable<LocalTime>, IComparable<LocalTime>, IFormattable, IComparable, IXmlSerializable
     {
         /// <summary>
         /// Local time at midnight, i.e. 0 hours, 0 minutes, 0 seconds.
@@ -40,9 +33,22 @@ namespace NodaTime
         public static LocalTime Midnight { get; } = new LocalTime(0, 0, 0);
 
         /// <summary>
+        /// The minimum value of this type; equivalent to <see cref="Midnight"/>.
+        /// </summary>
+        public static LocalTime MinValue => Midnight;
+
+        /// <summary>
         /// Local time at noon, i.e. 12 hours, 0 minutes, 0 seconds.
         /// </summary>
         public static LocalTime Noon { get; } = new LocalTime(12, 0, 0);
+
+        /// <summary>
+        /// The maximum value of this type, one nanosecond before midnight.
+        /// </summary>
+        /// <remarks>This is useful if you have to use an inclusive upper bound for some reason.
+        /// In general, it's better to use an exclusive upper bound, in which case use midnight of
+        /// the following day.</remarks>
+        public static LocalTime MaxValue { get; } = new LocalTime(NanosecondsPerDay - 1);
 
         /// <summary>
         /// Nanoseconds since midnight, in the range [0, 86,400,000,000,000).
@@ -83,7 +89,7 @@ namespace NodaTime
             // Avoid the method calls which give a decent exception unless we're actually going to fail.
             if (hour < 0 || hour > HoursPerDay - 1 ||
                 minute < 0 || minute > MinutesPerHour - 1 ||
-                second < 0 || second > SecondsPerHour - 1)
+                second < 0 || second > SecondsPerMinute - 1)
             {
                 Preconditions.CheckArgumentRange(nameof(hour), hour, 0, HoursPerDay - 1);
                 Preconditions.CheckArgumentRange(nameof(minute), minute, 0, MinutesPerHour - 1);
@@ -109,7 +115,7 @@ namespace NodaTime
             // Avoid the method calls which give a decent exception unless we're actually going to fail.
             if (hour < 0 || hour > HoursPerDay - 1 ||
                 minute < 0 || minute > MinutesPerHour - 1 ||
-                second < 0 || second > SecondsPerHour - 1 ||
+                second < 0 || second > SecondsPerMinute - 1 ||
                 millisecond < 0 || millisecond > MillisecondsPerSecond - 1)
             {
                 Preconditions.CheckArgumentRange(nameof(hour), hour, 0, HoursPerDay - 1);
@@ -125,7 +131,7 @@ namespace NodaTime
         }
 
         /// <summary>
-        /// Creates a local time at the given hour, minute, second, millisecond and tick within millisecond.
+        /// Factory method to create a local time at the given hour, minute, second, millisecond and tick within millisecond.
         /// </summary>
         /// <param name="hour">The hour of day.</param>
         /// <param name="minute">The minute of the hour.</param>
@@ -134,12 +140,12 @@ namespace NodaTime
         /// <param name="tickWithinMillisecond">The tick within the millisecond.</param>
         /// <exception cref="ArgumentOutOfRangeException">The parameters do not form a valid time.</exception>
         /// <returns>The resulting time.</returns>
-        public LocalTime(int hour, int minute, int second, int millisecond, int tickWithinMillisecond)
+        public static LocalTime FromHourMinuteSecondMillisecondTick(int hour, int minute, int second, int millisecond, int tickWithinMillisecond)
         {
             // Avoid the method calls which give a decent exception unless we're actually going to fail.
             if (hour < 0 || hour > HoursPerDay - 1 ||
                 minute < 0 || minute > MinutesPerHour - 1 ||
-                second < 0 || second > SecondsPerHour - 1 ||
+                second < 0 || second > SecondsPerMinute - 1 ||
                 millisecond < 0 || millisecond > MillisecondsPerSecond - 1 ||
                 tickWithinMillisecond < 0 || tickWithinMillisecond > TicksPerMillisecond - 1)
             {
@@ -149,12 +155,13 @@ namespace NodaTime
                 Preconditions.CheckArgumentRange(nameof(millisecond), millisecond, 0, MillisecondsPerSecond - 1);
                 Preconditions.CheckArgumentRange(nameof(tickWithinMillisecond), tickWithinMillisecond, 0, TicksPerMillisecond - 1);
             }
-            nanoseconds = unchecked(
+            long nanoseconds = unchecked(
                 hour * NanosecondsPerHour +
                 minute * NanosecondsPerMinute +
                 second * NanosecondsPerSecond +
                 millisecond * NanosecondsPerMillisecond +
                 tickWithinMillisecond * NanosecondsPerTick);
+            return new LocalTime(nanoseconds);
         }
 
         /// <summary>
@@ -174,7 +181,7 @@ namespace NodaTime
             // Avoid the method calls which give a decent exception unless we're actually going to fail.
             if (hour < 0 || hour > HoursPerDay - 1 ||
                 minute < 0 || minute > MinutesPerHour - 1 ||
-                second < 0 || second > SecondsPerHour - 1 ||
+                second < 0 || second > SecondsPerMinute - 1 ||
                 tickWithinSecond < 0 || tickWithinSecond > TicksPerSecond - 1)
             {
                 Preconditions.CheckArgumentRange(nameof(hour), hour, 0, HoursPerDay - 1);
@@ -206,7 +213,7 @@ namespace NodaTime
             // Avoid the method calls which give a decent exception unless we're actually going to fail.
             if (hour < 0 || hour > HoursPerDay - 1 ||
                 minute < 0 || minute > MinutesPerHour - 1 ||
-                second < 0 || second > SecondsPerHour - 1 ||
+                second < 0 || second > SecondsPerMinute - 1 ||
                 nanosecondWithinSecond < 0 || nanosecondWithinSecond > NanosecondsPerSecond - 1)
             {
                 Preconditions.CheckArgumentRange(nameof(hour), hour, 0, HoursPerDay - 1);
@@ -314,7 +321,7 @@ namespace NodaTime
             }
         }
 
-        // TODO(2.0): Consider exposing this.
+        // TODO(feature): Consider exposing this.
         /// <summary>
         /// Gets the hour of the half-day of this local time, in the range 0 to 11 inclusive.
         /// </summary>
@@ -370,7 +377,7 @@ namespace NodaTime
             }
         }
 
-        // TODO(2.0): Rewrite for performance?
+        // TODO(optimization): Rewrite for performance?
         /// <summary>
         /// Gets the tick of this local time within the second, in the range 0 to 9,999,999 inclusive.
         /// </summary>
@@ -380,6 +387,9 @@ namespace NodaTime
         /// <summary>
         /// Gets the tick of this local time within the day, in the range 0 to 863,999,999,999 inclusive.
         /// </summary>
+        /// <remarks>
+        /// If the value does not fall on a tick boundary, it will be truncated towards zero.
+        /// </remarks>
         /// <value>The tick of this local time within the day, in the range 0 to 863,999,999,999 inclusive.</value>
         public long TickOfDay => nanoseconds / NanosecondsPerTick;
 
@@ -465,7 +475,7 @@ namespace NodaTime
         /// <param name="lhs">The time to subtract from</param>
         /// <param name="rhs">The time to subtract</param>
         /// <returns>The result of subtracting one time from another.</returns>
-        public static Period operator -(LocalTime lhs, LocalTime rhs) => Period.Between(rhs, lhs);
+        [NotNull] public static Period operator -(LocalTime lhs, LocalTime rhs) => Period.Between(rhs, lhs);
 
         /// <summary>
         /// Subtracts one time from another, returning the result as a <see cref="Period"/> with units of years, months and days.
@@ -476,7 +486,7 @@ namespace NodaTime
         /// <param name="lhs">The time to subtract from</param>
         /// <param name="rhs">The time to subtract</param>
         /// <returns>The result of subtracting one time from another.</returns>
-        public static Period Subtract(LocalTime lhs, LocalTime rhs) => lhs - rhs;
+        [NotNull] public static Period Subtract(LocalTime lhs, LocalTime rhs) => lhs - rhs;
 
         /// <summary>
         /// Subtracts the specified time from this time, returning the result as a <see cref="Period"/>.
@@ -485,6 +495,7 @@ namespace NodaTime
         /// <param name="time">The time to subtract from this</param>
         /// <returns>The difference between the specified time and this one</returns>
         [Pure]
+        [NotNull]
         public Period Minus(LocalTime time) => this - time;
 
         /// <summary>
@@ -562,7 +573,7 @@ namespace NodaTime
         /// </returns>
         int IComparable.CompareTo(object obj)
         {
-            if (obj == null)
+            if (obj is null)
             {
                 return 1;
             }
@@ -663,6 +674,15 @@ namespace NodaTime
             Preconditions.CheckNotNull(adjuster, nameof(adjuster)).Invoke(this);
 
         /// <summary>
+        /// Returns an <see cref="OffsetTime"/> for this time-of-day with the given offset.
+        /// </summary>
+        /// <remarks>This method is purely a convenient alternative to calling the <see cref="OffsetTime"/> constructor directly.</remarks>
+        /// <param name="offset">The offset to apply.</param>
+        /// <returns>The result of this time-of-day offset by the given amount.</returns>
+        [Pure]
+        public OffsetTime WithOffset(Offset offset) => new OffsetTime(this, offset);
+
+        /// <summary>
         /// Combines this <see cref="LocalTime"/> with the given <see cref="LocalDate"/>
         /// into a single <see cref="LocalDateTime"/>.
         /// Fluent alternative to <c>operator+()</c>.
@@ -671,6 +691,39 @@ namespace NodaTime
         /// <returns>The <see cref="LocalDateTime"/> representation of the given time on this date</returns>
         [Pure]
         public LocalDateTime On(LocalDate date) => date + this;
+
+        /// <summary>
+        /// Deconstruct this time into its components.
+        /// </summary>
+        /// <param name="hour">The hour of the time.</param>
+        /// <param name="minute">The minute of the hour.</param>
+        /// <param name="second">The second within the minute.</param>
+        [Pure]
+        public void Deconstruct(out int hour, out int minute, out int second)
+        {
+            hour = Hour;
+            minute = Minute;
+            second = Second;
+        }
+        
+        /// <summary>
+        /// Returns the later time of the given two.
+        /// </summary>
+        /// <param name="x">The first time to compare.</param>
+        /// <param name="y">The second time to compare.</param>
+        /// <returns>The later instant of <paramref name="x"/> or <paramref name="y"/>.</returns>
+        public static LocalTime Max(LocalTime x, LocalTime y)
+        {
+            return x > y ? x : y;
+        }
+
+        /// <summary>
+        /// Returns the earlier time of the given two.
+        /// </summary>
+        /// <param name="x">The first time to compare.</param>
+        /// <param name="y">The second time to compare.</param>
+        /// <returns>The earlier time of <paramref name="x"/> or <paramref name="y"/>.</returns>
+        public static LocalTime Min(LocalTime x, LocalTime y) => x < y ? x : y;
 
         #region Formatting
         /// <summary>
@@ -710,49 +763,17 @@ namespace NodaTime
         void IXmlSerializable.ReadXml([NotNull] XmlReader reader)
         {
             Preconditions.CheckNotNull(reader, nameof(reader));
-            var pattern = LocalTimePattern.ExtendedIsoPattern;
+            var pattern = LocalTimePattern.ExtendedIso;
             string text = reader.ReadElementContentAsString();
-            this = pattern.Parse(text).Value;
+            Unsafe.AsRef(this) = pattern.Parse(text).Value;
         }
 
         /// <inheritdoc />
         void IXmlSerializable.WriteXml([NotNull] XmlWriter writer)
         {
             Preconditions.CheckNotNull(writer, nameof(writer));
-            writer.WriteString(LocalTimePattern.ExtendedIsoPattern.Format(this));
+            writer.WriteString(LocalTimePattern.ExtendedIso.Format(this));
         }
         #endregion
-
-#if !PCL
-        #region Binary serialization
-        private const string NanoOfDaySerializationName = "nanoOfDay";
-
-        /// <summary>
-        /// Private constructor only present for serialization.
-        /// </summary>
-        /// <param name="info">The <see cref="SerializationInfo"/> to fetch data from.</param>
-        /// <param name="context">The source for this deserialization.</param>
-        private LocalTime([NotNull] SerializationInfo info, StreamingContext context)
-        {
-            Preconditions.CheckNotNull(info, nameof(info));
-            long nanoOfDay = info.GetInt64(NanoOfDaySerializationName);
-            Preconditions.CheckArgument(nanoOfDay >= 0 && nanoOfDay < NanosecondsPerDay, nameof(info),
-                "Serialized offset value is outside the range of +/- 18 hours");
-            this.nanoseconds = nanoOfDay;
-        }
-
-        /// <summary>
-        /// Implementation of <see cref="ISerializable.GetObjectData"/>.
-        /// </summary>
-        /// <param name="info">The <see cref="SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination for this serialization.</param>
-        [System.Security.SecurityCritical]
-        void ISerializable.GetObjectData([NotNull] SerializationInfo info, StreamingContext context)
-        {
-            Preconditions.CheckNotNull(info, nameof(info));
-            info.AddValue(NanoOfDaySerializationName, nanoseconds);
-        }
-        #endregion
-#endif
     }
 }

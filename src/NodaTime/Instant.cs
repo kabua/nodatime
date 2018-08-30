@@ -2,44 +2,32 @@
 // Use of this source code is governed by the Apache License 2.0,
 // as found in the LICENSE.txt file.
 
-using static NodaTime.NodaConstants;
-
-using System;
-using System.Globalization;
-using System.Runtime.Serialization;
-using System.Xml;
-using System.Xml.Schema;
-using System.Xml.Serialization;
 using JetBrains.Annotations;
 using NodaTime.Annotations;
 using NodaTime.Calendars;
 using NodaTime.Text;
 using NodaTime.Utility;
+using System;
+using System.Globalization;
+using System.Runtime.CompilerServices;
+using System.Xml;
+using System.Xml.Schema;
+using System.Xml.Serialization;
+using static NodaTime.NodaConstants;
 
 namespace NodaTime
 {
     /// <summary>
-    /// Represents an instant on the global timeline.
+    /// Represents an instant on the global timeline, with nanosecond resolution.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// An instant is defined by an integral number of 'ticks' since the Unix epoch (typically described as January 1st
-    /// 1970, midnight, UTC, ISO calendar), where a tick is equal to 100 nanoseconds. There are 10,000 ticks in a
-    /// millisecond.
-    /// </para>
     /// <para>
     /// An <see cref="Instant"/> has no concept of a particular time zone or calendar: it simply represents a point in
     /// time that can be globally agreed-upon.
     /// </para>
     /// </remarks>
     /// <threadsafety>This type is an immutable value type. See the thread safety section of the user guide for more information.</threadsafety>
-#if !PCL
-    [Serializable]
-#endif
-    public struct Instant : IEquatable<Instant>, IComparable<Instant>, IFormattable, IComparable, IXmlSerializable
-#if !PCL
-        , ISerializable
-#endif
+    public readonly struct Instant : IEquatable<Instant>, IComparable<Instant>, IFormattable, IComparable, IXmlSerializable
     {
         // These correspond to -9998-01-01 and 9999-12-31 respectively.
         internal const int MinDays = -4371222;
@@ -77,7 +65,7 @@ namespace NodaTime
         /// <summary>
         /// Time elapsed since the Unix epoch.
         /// </summary>
-        [ReadWriteForEfficiency] private Duration duration;
+        private readonly Duration duration;
 
         /// <summary>
         /// Constructor which should *only* be used to construct the invalid instances.
@@ -191,7 +179,7 @@ namespace NodaTime
         /// </returns>
         int IComparable.CompareTo(object obj)
         {
-            if (obj == null)
+            if (obj is null)
             {
                 return 1;
             }
@@ -224,10 +212,19 @@ namespace NodaTime
         /// <summary>
         /// Returns a new value of this instant with the given number of ticks added to it.
         /// </summary>
-        /// <param name="ticksToAdd">The ticks to add to this instant to create the return value.</param>
+        /// <param name="ticks">The ticks to add to this instant to create the return value.</param>
         /// <returns>The result of adding the given number of ticks to this instant.</returns>
         [Pure]
-        public Instant PlusTicks(long ticksToAdd) => FromUntrustedDuration(duration + Duration.FromTicks(ticksToAdd));
+        public Instant PlusTicks(long ticks) => FromUntrustedDuration(duration + Duration.FromTicks(ticks));
+
+        /// <summary>
+        /// Returns a new value of this instant with the given number of nanoseconds added to it.
+        /// </summary>
+        /// <param name="nanoseconds">The nanoseconds to add to this instant to create the return value.</param>
+        /// <returns>The result of adding the given number of ticks to this instant.</returns>
+        [Pure]
+        public Instant PlusNanoseconds(long nanoseconds) => FromUntrustedDuration(duration + Duration.FromNanoseconds(nanoseconds));
+
         #region Operators
         /// <summary>
         /// Implements the operator + (addition) for <see cref="Instant" /> + <see cref="Duration" />.
@@ -239,6 +236,8 @@ namespace NodaTime
 
         /// <summary>
         /// Adds the given offset to this instant, to return a <see cref="LocalInstant" />.
+        /// A positive offset indicates that the local instant represents a "later local time" than the UTC
+        /// representation of this instant.
         /// </summary>
         /// <remarks>
         /// This was previously an operator+ implementation, but operators can't be internal.
@@ -315,7 +314,7 @@ namespace NodaTime
         /// <param name="left">The left hand side of the operator.</param>
         /// <param name="right">The right hand side of the operator.</param>
         /// <returns>A new <see cref="Instant" /> representing the difference of the given values.</returns>
-        public static Instant operator -(Instant left, Duration right) => new Instant(left.duration - right);
+        public static Instant operator -(Instant left, Duration right) => FromUntrustedDuration(left.duration - right);
 
         /// <summary>
         ///   Subtracts one instant from another. Friendly alternative to <c>operator-()</c>.
@@ -507,22 +506,51 @@ namespace NodaTime
         /// </summary>
         /// <returns>The number of days (including fractional days) since the Julian Epoch.</returns>
         [Pure]
+        [TestExemption(TestExemptionCategory.ConversionName)]
         public double ToJulianDate() => (this - JulianEpoch).TotalDays;
 
         /// <summary>
         /// Constructs a <see cref="DateTime"/> from this Instant which has a <see cref="DateTime.Kind" />
         /// of <see cref="DateTimeKind.Utc"/> and represents the same instant of time as this value.
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// If the date and time is not on a tick boundary (the unit of granularity of DateTime) the value will be truncated
+        /// towards the start of time.
+        /// </para>
+        /// </remarks>
+        /// <exception cref="InvalidOperationException">The final date/time is outside the range of <c>DateTime</c>.</exception>
         /// <returns>A <see cref="DateTime"/> representing the same instant in time as this value, with a kind of "universal".</returns>
         [Pure]
-        public DateTime ToDateTimeUtc() => new DateTime(BclTicksAtUnixEpoch + ToUnixTimeTicks(), DateTimeKind.Utc);
+        public DateTime ToDateTimeUtc()
+        {
+            if (this < BclEpoch)
+            {
+                throw new InvalidOperationException("Instant out of range for DateTime");
+            }
+            return new DateTime(BclTicksAtUnixEpoch + ToUnixTimeTicks(), DateTimeKind.Utc);
+        }
 
         /// <summary>
         /// Constructs a <see cref="DateTimeOffset"/> from this Instant which has an offset of zero.
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// If the date and time is not on a tick boundary (the unit of granularity of DateTime) the value will be truncated
+        /// towards the start of time.
+        /// </para>
+        /// </remarks>
+        /// <exception cref="InvalidOperationException">The final date/time is outside the range of <c>DateTimeOffset</c>.</exception>
         /// <returns>A <see cref="DateTimeOffset"/> representing the same instant in time as this value.</returns>
         [Pure]
-        public DateTimeOffset ToDateTimeOffset() => new DateTimeOffset(BclTicksAtUnixEpoch + ToUnixTimeTicks(), TimeSpan.Zero);
+        public DateTimeOffset ToDateTimeOffset()
+        {
+            if (this < BclEpoch)
+            {
+                throw new InvalidOperationException("Instant out of range for DateTimeOffset");
+            }
+            return new DateTimeOffset(BclTicksAtUnixEpoch + ToUnixTimeTicks(), TimeSpan.Zero);
+        }
 
         /// <summary>
         /// Converts a <see cref="DateTimeOffset"/> into a new Instant representing the same instant in time. Note that
@@ -586,8 +614,6 @@ namespace NodaTime
         /// Initializes a new instance of the <see cref="Instant" /> struct based
         /// on a number of ticks since the Unix epoch of (ISO) January 1st 1970, midnight, UTC.
         /// </summary>
-        /// <remarks>This is equivalent to calling the constructor directly, but indicates
-        /// intent more explicitly.</remarks>
         /// <returns>An <see cref="Instant"/> at exactly the given number of ticks since the Unix epoch.</returns>
         /// <param name="ticks">Number of ticks since the Unix epoch. May be negative (for instants before the epoch).</param>
         public static Instant FromUnixTimeTicks(long ticks)
@@ -604,6 +630,7 @@ namespace NodaTime
         /// </remarks>
         /// <value>The number of seconds since the Unix epoch.</value>
         [Pure]
+        [TestExemption(TestExemptionCategory.ConversionName)]
         public long ToUnixTimeSeconds() =>
             duration.FloorDays * (long) SecondsPerDay + duration.NanosecondOfFloorDay / NanosecondsPerSecond;
 
@@ -615,6 +642,7 @@ namespace NodaTime
         /// </remarks>
         /// <value>The number of milliseconds since the Unix epoch.</value>
         [Pure]
+        [TestExemption(TestExemptionCategory.ConversionName)]
         public long ToUnixTimeMilliseconds() =>
             duration.FloorDays * (long) MillisecondsPerDay + duration.NanosecondOfFloorDay / NanosecondsPerMillisecond;
 
@@ -627,8 +655,9 @@ namespace NodaTime
         /// </remarks>
         /// <returns>The number of ticks since the Unix epoch.</returns>
         [Pure]
+        [TestExemption(TestExemptionCategory.ConversionName)]
         public long ToUnixTimeTicks() =>
-            TickArithmetic.DaysAndTickOfDayToTicks(duration.FloorDays, duration.NanosecondOfFloorDay / NanosecondsPerTick);
+            TickArithmetic.BoundedDaysAndTickOfDayToTicks(duration.FloorDays, duration.NanosecondOfFloorDay / NanosecondsPerTick);
 
         /// <summary>
         /// Returns the <see cref="ZonedDateTime"/> representing the same point in time as this instant, in the UTC time
@@ -641,8 +670,9 @@ namespace NodaTime
         public ZonedDateTime InUtc()
         {
             // Bypass any determination of offset and arithmetic, as we know the offset is zero.
-            var ymdc = GregorianYearMonthDayCalculator.GetGregorianYearMonthDayCalendarFromDaysSinceEpoch(duration.FloorDays);
-            var offsetDateTime = new OffsetDateTime(ymdc, duration.NanosecondOfFloorDay);
+            var offsetDateTime = new OffsetDateTime(
+                new LocalDate(duration.FloorDays),
+                new OffsetTime(nanosecondOfDayZeroOffset: duration.NanosecondOfFloorDay));
             return new ZonedDateTime(offsetDateTime, DateTimeZone.Utc);
         }
 
@@ -707,50 +737,17 @@ namespace NodaTime
         void IXmlSerializable.ReadXml([NotNull] XmlReader reader)
         {
             Preconditions.CheckNotNull(reader, nameof(reader));
-            var pattern = InstantPattern.ExtendedIsoPattern;
+            var pattern = InstantPattern.ExtendedIso;
             string text = reader.ReadElementContentAsString();
-            this = pattern.Parse(text).Value;
+            Unsafe.AsRef(this) = pattern.Parse(text).Value;
         }
 
         /// <inheritdoc />
         void IXmlSerializable.WriteXml([NotNull] XmlWriter writer)
         {
             Preconditions.CheckNotNull(writer, nameof(writer));
-            writer.WriteString(InstantPattern.ExtendedIsoPattern.Format(this));
+            writer.WriteString(InstantPattern.ExtendedIso.Format(this));
         }
         #endregion
-
-#if !PCL
-        #region Binary serialization
-        /// <summary>
-        /// Private constructor only present for serialization.
-        /// </summary>
-        /// <param name="info">The <see cref="SerializationInfo"/> to fetch data from.</param>
-        /// <param name="context">The source for this deserialization.</param>
-        private Instant([NotNull] SerializationInfo info, StreamingContext context)
-            // FIXME:SERIALIZATION COMPATIBILITY
-        {
-            duration = new Duration(info);
-            // Duplication of code in Instant.FromUntrustedDuration,
-            // because we can't chain to a static method...
-            int days = duration.FloorDays;
-            if (days < MinDays || days > MaxDays)
-            {
-                throw new OverflowException("Operation would overflow range of Instant");
-            }
-        }
-
-        /// <summary>
-        /// Implementation of <see cref="ISerializable.GetObjectData"/>.
-        /// </summary>
-        /// <param name="info">The <see cref="SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination for this serialization.</param>
-        [System.Security.SecurityCritical]
-        void ISerializable.GetObjectData([NotNull] SerializationInfo info, StreamingContext context)
-        {
-            duration.Serialize(info);
-        }
-        #endregion
-#endif
     }
 }

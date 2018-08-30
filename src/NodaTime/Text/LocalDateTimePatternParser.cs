@@ -4,9 +4,7 @@
 
 using System.Collections.Generic;
 using NodaTime.Globalization;
-using NodaTime.Properties;
 using NodaTime.Text.Patterns;
-using System;
 
 namespace NodaTime.Text
 {
@@ -34,7 +32,7 @@ namespace NodaTime.Text
             { 'M', DatePatternHelper.CreateMonthOfYearHandler<LocalDateTime, LocalDateTimeParseBucket>
                         (value => value.Month, (bucket, value) => bucket.Date.MonthOfYearText = value, (bucket, value) => bucket.Date.MonthOfYearNumeric = value) },
             { 'd', DatePatternHelper.CreateDayHandler<LocalDateTime, LocalDateTimeParseBucket>
-                        (value => value.Day, value => value.DayOfWeek, (bucket, value) => bucket.Date.DayOfMonth = value, (bucket, value) => bucket.Date.DayOfWeek = value) },
+                        (value => value.Day, value => (int) value.DayOfWeek, (bucket, value) => bucket.Date.DayOfMonth = value, (bucket, value) => bucket.Date.DayOfWeek = value) },
             { '.', TimePatternHelper.CreatePeriodHandler<LocalDateTime, LocalDateTimeParseBucket>(9, value => value.NanosecondOfSecond, (bucket, value) => bucket.Time.FractionalSeconds = value) },
             { ';', TimePatternHelper.CreateCommaDotHandler<LocalDateTime, LocalDateTimeParseBucket>(9, value => value.NanosecondOfSecond, (bucket, value) => bucket.Time.FractionalSeconds = value) },
             { ':', (pattern, builder) => builder.AddLiteral(builder.FormatInfo.TimeSeparator, ParseResult<LocalDateTime>.TimeSeparatorMismatch) },
@@ -67,7 +65,7 @@ namespace NodaTime.Text
             // Nullity check is performed in LocalDateTimePattern.
             if (patternText.Length == 0)
             {
-                throw new InvalidPatternException(Messages.Parse_FormatStringEmpty);
+                throw new InvalidPatternException(TextErrorMessages.FormatStringEmpty);
             }
 
             if (patternText.Length == 1)
@@ -81,14 +79,18 @@ namespace NodaTime.Text
                 {
                     return LocalDateTimePattern.Patterns.FullRoundtripPatternImpl;
                 }
+                if (patternCharacter == 'R')
+                {
+                    return LocalDateTimePattern.Patterns.FullRoundtripWithoutCalendarImpl;
+                }
                 if (patternCharacter == 's')
                 {
                     return LocalDateTimePattern.Patterns.GeneralIsoPatternImpl;
                 }
                 patternText = ExpandStandardFormatPattern(patternCharacter, formatInfo);
-                if (patternText == null)
+                if (patternText is null)
                 {
-                    throw new InvalidPatternException(Messages.Parse_UnknownStandardFormat, patternCharacter, typeof(LocalDateTime));
+                    throw new InvalidPatternException(TextErrorMessages.UnknownStandardFormat, patternCharacter, typeof(LocalDateTime));
                 }
             }
 

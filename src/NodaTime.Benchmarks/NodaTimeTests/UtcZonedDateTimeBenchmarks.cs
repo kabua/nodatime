@@ -7,7 +7,6 @@ using NodaTime.Calendars;
 
 namespace NodaTime.Benchmarks.NodaTimeTests
 {
-    [Config(typeof(BenchmarkConfig))]
     public class UtcZonedDateTimeBenchmarks
     {
         private static readonly LocalDateTime SampleLocal = new LocalDateTime(2009, 12, 26, 10, 8, 30);
@@ -29,7 +28,7 @@ namespace NodaTime.Benchmarks.NodaTimeTests
         public int DayOfMonth() => Sample.Day;
 
         [Benchmark]
-        public IsoDayOfWeek IsoDayOfWeek() => Sample.IsoDayOfWeek;
+        public IsoDayOfWeek DayOfWeek() => Sample.DayOfWeek;
 
         [Benchmark]
         public int DayOfYear() => Sample.DayOfYear;

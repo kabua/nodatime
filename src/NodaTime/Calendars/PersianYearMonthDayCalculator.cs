@@ -4,7 +4,7 @@
 
 using NodaTime.Utility;
 using System;
-using System.Globalization;
+using System.Diagnostics.CodeAnalysis;
 
 namespace NodaTime.Calendars
 {
@@ -22,7 +22,7 @@ namespace NodaTime.Calendars
         private const int DaysPerLeapYear = DaysPerNonLeapYear + 1;
         // Approximation; it'll be pretty close in all variants.
         private const int AverageDaysPer10Years = (DaysPerNonLeapYear * 25 + DaysPerLeapYear * 8) * 10 / 33;
-        private const int MaxPersianYear = 9377;
+        internal const int MaxPersianYear = 9377;
 
         private static readonly int[] TotalDaysByMonth;
 
@@ -63,6 +63,7 @@ namespace NodaTime.Calendars
             return startOfYearInDaysCache[year];
         }
 
+        [ExcludeFromCodeCoverage]
         protected sealed override int CalculateStartOfYearDays(int year)
         {
             // This would only be called from GetStartOfYearInDays, which is overridden.
@@ -93,18 +94,6 @@ namespace NodaTime.Calendars
                 int dayOfSecondHalf = dayOfYearZeroBased - 6 * 31;
                 month = dayOfSecondHalf / 30 + 7;
                 day = (dayOfSecondHalf % 30) + 1;
-            }
-            return new YearMonthDay(year, month, day);
-        }
-
-        internal sealed override YearMonthDay SetYear(YearMonthDay yearMonthDay, int year)
-        {
-            int month = yearMonthDay.Month;
-            int day = yearMonthDay.Day;
-            // The only value which might change day is the last day of a leap year
-            if (month == 12 && day == 30 && !IsLeapYear(year))
-            {
-                day = 29;
             }
             return new YearMonthDay(year, month, day);
         }
@@ -179,25 +168,27 @@ namespace NodaTime.Calendars
         {
             // Ugly, but the simplest way of embedding a big chunk of binary data...
             private static readonly byte[] AstronomicalLeapYearBits = Convert.FromBase64String(
-                "ICIiIkJERESEiIiICBEREREiIiJCREREhIiIiAgRERERIiIiIkRERISIiIiIEBERESEiIiJEREREiIiIiBARER" +
-                "EhIiIiQkRERISIiIgIERERESIiIkJERESEiIiICBEREREiIiIiRERERIiIiIgQERERISIiIkJERESEiIiICBER" +
-                "EREiIiIiREREhIiIiAgRERERISIiIkRERESIiIiIEBERESEiIiJCREREhIiIiAgRERERIiIiIkRERISIiIgIER" +
-                "ERESEiIiJEREREiIiIiBAREREhIiIiQkRERISIiIgIERERESIiIiJEREREiIiIiBAREREhIiIiQkRERIiIiIgQ" +
-                "ERERISIiIiJERESEiIiICBEREREiIiIiRERERIiIiIgQERERISIiIkJERESEiIiICBEREREiIiIiRERERIiIiA" +
-                "gRERERIiIiIkJERESEiIiIEBERESEiIiJCRERERIiIiAgRERERIiIiIkRERESIiIiIEBERESEiIiJCREREhIiI" +
-                "iAgREREhIiIiIkRERESIiIiIEBERESIiIiJEREREiIiIiBAREREhIiIiQkRERISIiIgIERERESIiIiJEREREiI" +
-                "iIiBAREREiIiIiRERERIiIiIgQERERISIiIkJERESEiIiICBERESEiIiJCREREhIiIiAgRERERIiIiIkRERESI" +
-                "iIiIEBERESIiIiJEREREiIiIiBAREREhIiIiQkRERISIiIgIERERISIiIkJERESEiIiICBEREREiIiIiRERERI" +
-                "iIiAgRERERIiIiIkRERESIiIgIERERESIiIiJEREREiIiIiBAREREhIiIiQkRERIiIiIgQERERISIiIkJERESI" +
-                "iIiIEBERESEiIiJCREREiIiIiBAREREhIiIiQkRERIiIiIgQERERISIiIkRERESIiIiIEBERESIiIiJEREREiI" +
-                "iIiBAREREiIiIiRERERIiIiAgRERERIiIiIkRERISIiIgIERERESIiIkJERESEiIiIEBERESEiIiJEREREiIiI" +
-                "iBAREREiIiIiRERERIiIiAgRERERIiIiIkRERISIiIgQERERISIiIkJERESIiIiIEBERESEiIiJERESEiIiICB" +
-                "ERESEiIiJCREREhIiIiBAREREhIiIiREREhIiIiAgRERERIiIiQkRERIiIiIgQERERIiIiIkRERISIiIgQERER" +
-                "ISIiIkRERESIiIgIERERISIiIkJERESIiIiIEBERESIiIkJERESIiIiIEBERESIiIiJERESEiIiIEBERESEiIi" +
-                "JERESEiIiICBERESEiIiJEREREiIiICBERESEiIiJERESEiIiICBERESEiIiJEREREiIiICBERESEiIiJERESE" +
-                "iIiICBERESEiIiJERESEiIiICBERESEiIiJERESEiIiIEBERESIiIiJERESEiIiIEBERESIiIkJERESIiIgIER" +
-                "ERISIiIkRERESIiIgIERERISIiIkRERISIiIgQERERIiIiQkRERIiIiAgREREhIiIiREREhIiIiBAREREiIiJC" +
-                "REREiIiICBERESEC");
+                "ICIiIkJERESEiIiICBEREREiIiJCREREhIiIiAgRERERIiIiIkRERISIiIiIEBERESEiIiJEREREiIiI" +
+                "iBAREREhIiIiQkRERISIiIgIERERESIiIkJERESEiIiICBEREREiIiIiRERERIiIiIgQERERISIiIkJE" +
+                "RESEiIiICBEREREiIiIiREREhIiIiAgRERERISIiIkRERESIiIiIEBERESEiIiJCREREhIiIiAgRERER" +
+                "IiIiIkRERISIiIgIERERESEiIiJEREREiIiIiBAREREhIiIiQkRERISIiIgIERERESIiIiJEREREiIiI" +
+                "iBAREREhIiIiQkRERIiIiIgQERERISIiIiJERESEiIiICBEREREiIiIiRERERIiIiIgQERERISIiIkJE" +
+                "RESEiIiICBEREREiIiIiRERERIiIiAgRERERIiIiIkJERESEiIiIEBERESEiIiJCRERERIiIiAgRERER" +
+                "IiIiIkRERESIiIiIEBERESEiIiJCREREhIiIiAgREREhIiIiIkRERESIiIiIEBERESIiIiJEREREiIiI" +
+                "iBAREREhIiIiQkRERISIiIgIERERESIiIiJEREREiIiIiBAREREiIiIiRERERIiIiIgQERERISIiIkJE" +
+                "RESEiIiICBERESEiIiJCREREhIiIiAgRERERIiIiIkRERESIiIiIEBERESIiIiJEREREiIiIiBAREREh" +
+                "IiIiQkRERISIiIgIERERISIiIkJERESEiIiICBEREREiIiIiRERERIiIiAgRERERIiIiIkRERESIiIgI" +
+                "ERERESIiIiJEREREiIiIiBAREREhIiIiQkRERIiIiIgQERERISIiIkJERESIiIiIEBERESEiIiJCRERE" +
+                "iIiIiBAREREhIiIiQkRERIiIiIgQERERISIiIkRERESIiIiIEBERESIiIiJEREREiIiIiBAREREiIiIi" +
+                "RERERIiIiAgRERERIiIiIkRERISIiIgIERERESIiIkJERESEiIiIEBERESEiIiJEREREiIiIiBAREREi" +
+                "IiIiRERERIiIiAgRERERIiIiIkRERISIiIgQERERISIiIkJERESIiIiIEBERESEiIiJERESEiIiICBER" +
+                "ESEiIiJCREREhIiIiBAREREhIiIiREREhIiIiAgRERERIiIiQkRERIiIiIgQERERIiIiIkRERISIiIgQ" +
+                "ERERISIiIkRERESIiIgIERERISIiIkJERESIiIiIEBERESIiIkJERESIiIiIEBERESIiIiJERESEiIiI" +
+                "EBERESEiIiJERESEiIiICBERESEiIiJEREREiIiICBERESEiIiJERESEiIiICBERESEiIiJEREREiIiI" +
+                "CBERESEiIiJERESEiIiICBERESEiIiJERESEiIiICBERESEiIiJERESEiIiIEBERESIiIiJERESEiIiI" +
+                "EBERESIiIkJERESIiIgIERERISIiIkRERESIiIgIERERISIiIkRERISIiIgQERERIiIiQkRERIiIiAgR" +
+                "EREhIiIiREREhIiIiBAREREiIiJCREREiIiICBERESEC"
+            );
 
             internal Astronomical() : base(-492267)
             {
@@ -205,29 +196,6 @@ namespace NodaTime.Calendars
 
             // 8 years per byte.
             internal override bool IsLeapYear(int year) => (AstronomicalLeapYearBits[year >> 3] & (1 << (year & 7))) != 0;
-
-#if DEBUG && !PCL
-
-            /// <summary>
-            /// This method is only present to make it simple to generate the data.
-            /// </summary>
-            /// <returns></returns>
-            internal static string GenerateLeapYearData()
-            {
-                var bcl = new PersianCalendar();
-                byte[] data = new byte[MaxPersianYear / 8 + 1];
-                // We don't really care whether IsLeapYear(MaxPersianYear+1) returns true or false,
-                // but it must be valid to call it.
-                for (int year = 1; year <= MaxPersianYear; year++)
-                {
-                    if (bcl.IsLeapYear(year))
-                    {
-                        data[year >> 3] |= (byte)(1 << (year & 7));
-                    }
-                }
-                return Convert.ToBase64String(data);
-            }
-#endif
         }
     }
 }

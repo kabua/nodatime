@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using NodaTime.Calendars;
 using NUnit.Framework;
 
 namespace NodaTime.Test
@@ -41,24 +40,6 @@ namespace NodaTime.Test
         }
 
         [Test]
-        public void GetUmAlQuraCalendar_ThrowsOnUnsupportedPlatform()
-        {
-            if (!UmAlQuraYearMonthDayCalculator.IsSupported)
-            {
-                Assert.Throws<NotSupportedException>(() => CalendarSystem.UmAlQura.ToString());
-            }
-        }
-
-        [Test]
-        public void GetUmAlQuraCalendar_WorksOnsupportedPlatform()
-        {
-            if (UmAlQuraYearMonthDayCalculator.IsSupported)
-            {
-                Assert.IsNotNull(CalendarSystem.UmAlQura);
-            }
-        }
-
-        [Test]
         public void NoSubstrings()
         {
             CompareInfo comparison = CultureInfo.InvariantCulture.CompareInfo;
@@ -86,22 +67,16 @@ namespace NodaTime.Test
             Assert.AreSame(calendar, CalendarSystem.ForOrdinal(calendar.Ordinal));
         }
 
-        [Test]
-        public void ForOrdinal_UmAlQura_ThrowsOnUnsupportedPlatform()
+        [Test, TestCaseSource(nameof(SupportedCalendars))]
+        public void ForOrdinalUncached_Roundtrip(CalendarSystem calendar)
         {
-            if (!UmAlQuraYearMonthDayCalculator.IsSupported)
-            {
-                Assert.Throws<NotSupportedException>(() => CalendarSystem.ForOrdinal(CalendarOrdinal.UmAlQura));
-            }
+            Assert.AreSame(calendar, CalendarSystem.ForOrdinalUncached(calendar.Ordinal));
         }
 
         [Test]
-        public void ForOrdinal_UmAlQura_WorksOnsupportedPlatform()
+        public void ForOrdinalUncached_Invalid()
         {
-            if (UmAlQuraYearMonthDayCalculator.IsSupported)
-            {
-                Assert.IsNotNull(CalendarSystem.ForOrdinal(CalendarOrdinal.UmAlQura));
-            }
+            Assert.Throws<InvalidOperationException>(() => CalendarSystem.ForOrdinalUncached((CalendarOrdinal)9999));
         }
     }
 }

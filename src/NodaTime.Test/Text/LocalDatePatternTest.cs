@@ -6,9 +6,9 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using NodaTime.Properties;
 using NodaTime.Text;
 using NUnit.Framework;
+using NodaTime.Test.Calendars;
 
 namespace NodaTime.Test.Text
 {
@@ -17,77 +17,82 @@ namespace NodaTime.Test.Text
         private static readonly LocalDate SampleLocalDate = new LocalDate(1976, 6, 19);
 
         internal static readonly Data[] InvalidPatternData = {
-            new Data { Pattern = "!", Message = Messages.Parse_UnknownStandardFormat, Parameters = {'!', typeof(LocalDate).FullName }},
-            new Data { Pattern = "%", Message = Messages.Parse_UnknownStandardFormat, Parameters = { '%', typeof(LocalDate).FullName } },
-            new Data { Pattern = "\\", Message = Messages.Parse_UnknownStandardFormat, Parameters = { '\\', typeof(LocalDate).FullName } },
-            new Data { Pattern = "%%", Message = Messages.Parse_PercentDoubled },
-            new Data { Pattern = "%\\", Message = Messages.Parse_EscapeAtEndOfString },
-            new Data { Pattern = "MMMMM", Message = Messages.Parse_RepeatCountExceeded, Parameters = { 'M', 4 } },
-            new Data { Pattern = "ddddd", Message = Messages.Parse_RepeatCountExceeded, Parameters = { 'd', 4 } },
-            new Data { Pattern = "M%", Message = Messages.Parse_PercentAtEndOfString },
-            new Data { Pattern = "yyyyy", Message = Messages.Parse_RepeatCountExceeded, Parameters = { 'y', 4 } },
-            new Data { Pattern = "uuuuu", Message = Messages.Parse_RepeatCountExceeded, Parameters = { 'u', 4 } },
-            new Data { Pattern = "ggg", Message = Messages.Parse_RepeatCountExceeded, Parameters = { 'g', 2 } },
-            new Data { Pattern = "'qwe", Message = Messages.Parse_MissingEndQuote, Parameters = { '\'' } },
-            new Data { Pattern = "'qwe\\", Message = Messages.Parse_EscapeAtEndOfString },
-            new Data { Pattern = "'qwe\\'", Message = Messages.Parse_MissingEndQuote, Parameters = { '\'' } },
+            new Data { Pattern = "", Message = TextErrorMessages.FormatStringEmpty },
+            new Data { Pattern = "!", Message = TextErrorMessages.UnknownStandardFormat, Parameters = {'!', typeof(LocalDate).FullName }},
+            new Data { Pattern = "%", Message = TextErrorMessages.UnknownStandardFormat, Parameters = { '%', typeof(LocalDate).FullName } },
+            new Data { Pattern = "\\", Message = TextErrorMessages.UnknownStandardFormat, Parameters = { '\\', typeof(LocalDate).FullName } },
+            new Data { Pattern = "%%", Message = TextErrorMessages.PercentDoubled },
+            new Data { Pattern = "%\\", Message = TextErrorMessages.EscapeAtEndOfString },
+            new Data { Pattern = "MMMMM", Message = TextErrorMessages.RepeatCountExceeded, Parameters = { 'M', 4 } },
+            new Data { Pattern = "ddddd", Message = TextErrorMessages.RepeatCountExceeded, Parameters = { 'd', 4 } },
+            new Data { Pattern = "M%", Message = TextErrorMessages.PercentAtEndOfString },
+            new Data { Pattern = "yyyyy", Message = TextErrorMessages.RepeatCountExceeded, Parameters = { 'y', 4 } },
+            new Data { Pattern = "uuuuu", Message = TextErrorMessages.RepeatCountExceeded, Parameters = { 'u', 4 } },
+            new Data { Pattern = "ggg", Message = TextErrorMessages.RepeatCountExceeded, Parameters = { 'g', 2 } },
+            new Data { Pattern = "'qwe", Message = TextErrorMessages.MissingEndQuote, Parameters = { '\'' } },
+            new Data { Pattern = "'qwe\\", Message = TextErrorMessages.EscapeAtEndOfString },
+            new Data { Pattern = "'qwe\\'", Message = TextErrorMessages.MissingEndQuote, Parameters = { '\'' } },
             // Note incorrect use of "u" (year) instead of "y" (year of era)
-            new Data { Pattern = "dd MM uuuu gg", Message = Messages.Parse_EraWithoutYearOfEra },
+            new Data { Pattern = "dd MM uuuu gg", Message = TextErrorMessages.EraWithoutYearOfEra },
             // Era specifier and calendar specifier in the same pattern.
-            new Data { Pattern = "dd MM yyyy gg c", Message = Messages.Parse_CalendarAndEra },
+            new Data { Pattern = "dd MM yyyy gg c", Message = TextErrorMessages.CalendarAndEra },
 
             // Invalid patterns directly after the yyyy specifier. This will detect the issue early, but then
             // continue and reject it in the normal path.
-            new Data { Pattern = "yyyy'", Message = Messages.Parse_MissingEndQuote, Parameters = { '\'' } },
-            new Data { Pattern = "yyyy\\", Message = Messages.Parse_EscapeAtEndOfString },
+            new Data { Pattern = "yyyy'", Message = TextErrorMessages.MissingEndQuote, Parameters = { '\'' } },
+            new Data { Pattern = "yyyy\\", Message = TextErrorMessages.EscapeAtEndOfString },
 
             // Common typo, which is caught in 2.0...
-            new Data { Pattern = "yyyy-mm-dd", Message = Messages.Parse_UnquotedLiteral, Parameters = { 'm' } },
+            new Data { Pattern = "yyyy-mm-dd", Message = TextErrorMessages.UnquotedLiteral, Parameters = { 'm' } },
             // T isn't valid in a date pattern
-            new Data { Pattern = "yyyy-MM-ddT00:00:00", Message = Messages.Parse_UnquotedLiteral, Parameters = { 'T' } },
+            new Data { Pattern = "yyyy-MM-ddT00:00:00", Message = TextErrorMessages.UnquotedLiteral, Parameters = { 'T' } },
 
             // These became invalid in v2.0, when we decided that y and yyy weren't sensible.
-            new Data { Pattern = "y M d", Message = Messages.Parse_InvalidRepeatCount, Parameters = { 'y', 1 } },
-            new Data { Pattern = "yyy M d", Message = Messages.Parse_InvalidRepeatCount, Parameters = { 'y', 3 } },
+            new Data { Pattern = "y M d", Message = TextErrorMessages.InvalidRepeatCount, Parameters = { 'y', 1 } },
+            new Data { Pattern = "yyy M d", Message = TextErrorMessages.InvalidRepeatCount, Parameters = { 'y', 3 } },
         };
 
         internal static Data[] ParseFailureData = {
-            new Data { Pattern = "yyyy gg", Text = "2011 NodaEra", Message = Messages.Parse_MismatchedText, Parameters = {'g'} },
-            new Data { Pattern = "yyyy uuuu gg", Text = "0010 0009 B.C.", Message = Messages.Parse_InconsistentValues2, Parameters = {'g', 'u', typeof(LocalDate)} },
-            new Data { Pattern = "yyyy MM dd dddd", Text = "2011 10 09 Saturday", Message = Messages.Parse_InconsistentDayOfWeekTextValue },
-            new Data { Pattern = "yyyy MM dd ddd", Text = "2011 10 09 Sat", Message = Messages.Parse_InconsistentDayOfWeekTextValue },
-            new Data { Pattern = "yyyy MM dd ddd", Text = "2011 10 09 FooBar", Message = Messages.Parse_MismatchedText, Parameters = {'d'} },
-            new Data { Pattern = "yyyy MM dd dddd", Text = "2011 10 09 FooBar", Message = Messages.Parse_MismatchedText, Parameters = {'d'} },
-            new Data { Pattern = "yyyy/MM/dd", Text = "2011/02-29", Message = Messages.Parse_DateSeparatorMismatch },
+            new Data { Pattern = "yyyy gg", Text = "2011 NodaEra", Message = TextErrorMessages.MismatchedText, Parameters = {'g'} },
+            new Data { Pattern = "yyyy uuuu gg", Text = "0010 0009 B.C.", Message = TextErrorMessages.InconsistentValues2, Parameters = {'g', 'u', typeof(LocalDate)} },
+            new Data { Pattern = "yyyy MM dd dddd", Text = "2011 10 09 Saturday", Message = TextErrorMessages.InconsistentDayOfWeekTextValue },
+            new Data { Pattern = "yyyy MM dd ddd", Text = "2011 10 09 Sat", Message = TextErrorMessages.InconsistentDayOfWeekTextValue },
+            new Data { Pattern = "yyyy MM dd MMMM", Text = "2011 10 09 January", Message = TextErrorMessages.InconsistentMonthTextValue },
+            new Data { Pattern = "yyyy MM dd ddd", Text = "2011 10 09 FooBar", Message = TextErrorMessages.MismatchedText, Parameters = {'d'} },
+            new Data { Pattern = "yyyy MM dd dddd", Text = "2011 10 09 FooBar", Message = TextErrorMessages.MismatchedText, Parameters = {'d'} },
+            new Data { Pattern = "yyyy/MM/dd", Text = "2011/02-29", Message = TextErrorMessages.DateSeparatorMismatch },
             // Don't match a short name against a long pattern
-            new Data { Pattern = "yyyy MMMM dd", Text = "2011 Oct 09", Message = Messages.Parse_MismatchedText, Parameters = {'M'} },
+            new Data { Pattern = "yyyy MMMM dd", Text = "2011 Oct 09", Message = TextErrorMessages.MismatchedText, Parameters = {'M'} },
             // Or vice versa... although this time we match the "Oct" and then fail as we're expecting a space
-            new Data { Pattern = "yyyy MMM dd", Text = "2011 October 09", Message = Messages.Parse_MismatchedCharacter, Parameters = {' '}},
+            new Data { Pattern = "yyyy MMM dd", Text = "2011 October 09", Message = TextErrorMessages.MismatchedCharacter, Parameters = {' '}},
 
             // Invalid year, year-of-era, month, day
-            new Data { Pattern = "yyyy MM dd", Text = "0000 01 01", Message = Messages.Parse_FieldValueOutOfRange, Parameters = { 0, 'y', typeof(LocalDate) } },
-            new Data { Pattern = "yyyy MM dd", Text = "2011 15 29", Message = Messages.Parse_MonthOutOfRange, Parameters = { 15, 2011 } },
-            new Data { Pattern = "yyyy MM dd", Text = "2011 02 35", Message = Messages.Parse_DayOfMonthOutOfRange, Parameters = { 35, 2, 2011 } },
+            new Data { Pattern = "yyyy MM dd", Text = "0000 01 01", Message = TextErrorMessages.FieldValueOutOfRange, Parameters = { 0, 'y', typeof(LocalDate) } },
+            new Data { Pattern = "yyyy MM dd", Text = "2011 15 29", Message = TextErrorMessages.MonthOutOfRange, Parameters = { 15, 2011 } },
+            new Data { Pattern = "yyyy MM dd", Text = "2011 02 35", Message = TextErrorMessages.DayOfMonthOutOfRange, Parameters = { 35, 2, 2011 } },
             // Year of era can't be negative...
-            new Data { Pattern = "yyyy MM dd", Text = "-15 01 01", Message = Messages.Parse_UnexpectedNegative },
+            new Data { Pattern = "yyyy MM dd", Text = "-15 01 01", Message = TextErrorMessages.UnexpectedNegative },
 
             // Invalid leap years
-            new Data { Pattern = "yyyy MM dd", Text = "2011 02 29", Message = Messages.Parse_DayOfMonthOutOfRange, Parameters = { 29, 2, 2011 } },
-            new Data { Pattern = "yyyy MM dd", Text = "1900 02 29", Message = Messages.Parse_DayOfMonthOutOfRange, Parameters = { 29, 2, 1900 } },
+            new Data { Pattern = "yyyy MM dd", Text = "2011 02 29", Message = TextErrorMessages.DayOfMonthOutOfRange, Parameters = { 29, 2, 2011 } },
+            new Data { Pattern = "yyyy MM dd", Text = "1900 02 29", Message = TextErrorMessages.DayOfMonthOutOfRange, Parameters = { 29, 2, 1900 } },
 
             // Year of era and two-digit year, but they don't match
-            new Data { Pattern = "uuuu yy", Text = "2011 10", Message = Messages.Parse_InconsistentValues2, Parameters = { 'y', 'u', typeof(LocalDate) } },
+            new Data { Pattern = "uuuu yy", Text = "2011 10", Message = TextErrorMessages.InconsistentValues2, Parameters = { 'y', 'u', typeof(LocalDate) } },
 
             // Invalid calendar name
-            new Data { Pattern = "c yyyy MM dd", Text = "2015 01 01", Message = Messages.Parse_NoMatchingCalendarSystem },
+            new Data { Pattern = "c yyyy MM dd", Text = "2015 01 01", Message = TextErrorMessages.NoMatchingCalendarSystem },
 
             // Invalid year
-            new Data { Template = new LocalDate(1, 1, 1, CalendarSystem.IslamicBcl), Pattern = "uuuu", Text = "9999", Message = Messages.Parse_FieldValueOutOfRange, Parameters = { 9999, 'u', typeof(LocalDate) } },
-            new Data { Template = new LocalDate(1, 1, 1, CalendarSystem.IslamicBcl), Pattern = "yyyy", Text = "9999", Message = Messages.Parse_YearOfEraOutOfRange, Parameters = { 9999, "EH", "Hijri" } },
+            new Data { Template = new LocalDate(1, 1, 1, CalendarSystem.IslamicBcl), Pattern = "uuuu", Text = "9999", Message = TextErrorMessages.FieldValueOutOfRange, Parameters = { 9999, 'u', typeof(LocalDate) } },
+            new Data { Template = new LocalDate(1, 1, 1, CalendarSystem.IslamicBcl), Pattern = "yyyy", Text = "9999", Message = TextErrorMessages.YearOfEraOutOfRange, Parameters = { 9999, "EH", "Hijri" } },
 
             // https://github.com/nodatime/nodatime/issues/414
-            new Data { Pattern = "yyyy-MM-dd", Text = "1984-00-15", Message = Messages.Parse_FieldValueOutOfRange, Parameters = { 0, 'M', typeof(LocalDate) } },
-            new Data { Pattern = "M/d/yyyy", Text = "00/15/1984", Message = Messages.Parse_FieldValueOutOfRange, Parameters = { 0, 'M', typeof(LocalDate) } }
+            new Data { Pattern = "yyyy-MM-dd", Text = "1984-00-15", Message = TextErrorMessages.FieldValueOutOfRange, Parameters = { 0, 'M', typeof(LocalDate) } },
+            new Data { Pattern = "M/d/yyyy", Text = "00/15/1984", Message = TextErrorMessages.FieldValueOutOfRange, Parameters = { 0, 'M', typeof(LocalDate) } },
+
+            // Calendar ID parsing is now ordinal, case-sensitive
+            new Data(2011, 10, 9) { Pattern = "yyyy MM dd c", Text = "2011 10 09 iso", Message = TextErrorMessages.NoMatchingCalendarSystem },
         };
 
         internal static Data[] ParseOnlyData = {
@@ -183,6 +188,8 @@ namespace NodaTime.Test.Text
             new Data(2011, 10, 9, CalendarSystem.Coptic) { Pattern = "c uuuu MM dd", Text = "Coptic 2011 10 09" },
             new Data(2011, 10, 9, CalendarSystem.Coptic) { Pattern = "uuuu MM dd c", Text = "2011 10 09 Coptic" },
 
+            new Data(180, 15, 19, CalendarSystem.Badi) { Pattern = "uuuu MM dd c", Text = "0180 15 19 Badi" },
+
             // Awkward day-of-week handling
             // December 14th 2012 was a Friday. Friday is "Foo" or "FooBar" in AwkwardDayOfWeekCulture.
             new Data(2012, 12, 14) { Pattern = "ddd yyyy MM dd", Text = "Foo 2012 12 14", Culture = Cultures.AwkwardDayOfWeekCulture },
@@ -190,6 +197,14 @@ namespace NodaTime.Test.Text
             // December 13th 2012 was a Thursday. Friday is "FooBaz" or "FooBa" in AwkwardDayOfWeekCulture.
             new Data(2012, 12, 13) { Pattern = "ddd yyyy MM dd", Text = "FooBaz 2012 12 13", Culture = Cultures.AwkwardDayOfWeekCulture },
             new Data(2012, 12, 13) { Pattern = "dddd yyyy MM dd", Text = "FooBa 2012 12 13", Culture = Cultures.AwkwardDayOfWeekCulture },
+
+            // 3 digit year patterns (odd, but valid)
+            new Data(12, 1, 2) { Pattern = "uuu MM dd", Text = "012 01 02" },
+            new Data(-12, 1, 2) { Pattern = "uuu MM dd", Text = "-012 01 02" },
+            new Data(123, 1, 2) { Pattern = "uuu MM dd", Text = "123 01 02" },
+            new Data(-123, 1, 2) { Pattern = "uuu MM dd", Text = "-123 01 02" },
+            new Data(1234, 1, 2) { Pattern = "uuu MM dd", Text = "1234 01 02" },
+            new Data(-1234, 1, 2) { Pattern = "uuu MM dd", Text = "-1234 01 02" },
         };
 
         internal static IEnumerable<Data> ParseData = ParseOnlyData.Concat(FormatAndParseData);
@@ -199,11 +214,6 @@ namespace NodaTime.Test.Text
         [TestCaseSource(typeof(Cultures), nameof(Cultures.AllCultures))]
         public void BclLongDatePatternGivesSameResultsInNoda(CultureInfo culture)
         {
-            // See https://bugzilla.xamarin.com/show_bug.cgi?id=11363
-            if (TestHelper.IsRunningOnMono && culture.IetfLanguageTag == "mt-MT")
-            {
-                return;
-            }
             AssertBclNodaEquality(culture, culture.DateTimeFormat.LongDatePattern);
         }
 
@@ -217,10 +227,29 @@ namespace NodaTime.Test.Text
         [Test]
         public void WithCalendar()
         {
-            var pattern = LocalDatePattern.IsoPattern.WithCalendar(CalendarSystem.Coptic);
+            var pattern = LocalDatePattern.Iso.WithCalendar(CalendarSystem.Coptic);
             var value = pattern.Parse("0284-08-29").Value;
             Assert.AreEqual(new LocalDate(284, 8, 29, CalendarSystem.Coptic), value);
         }
+
+        [Test]
+        public void CreateWithCurrentCulture()
+        {
+            var date = new LocalDate(2017, 8, 23);
+            using (CultureSaver.SetCultures(Cultures.FrFr))
+            {
+                var pattern = LocalDatePattern.CreateWithCurrentCulture("d");
+                Assert.AreEqual("23/08/2017", pattern.Format(date));
+            }
+            using (CultureSaver.SetCultures(Cultures.FrCa))
+            {
+                var pattern = LocalDatePattern.CreateWithCurrentCulture("d");
+                Assert.AreEqual("2017-08-23", pattern.Format(date));
+            }
+        }
+
+        [Test]
+        public void ParseNull() => AssertParseNull(LocalDatePattern.Iso);
 
         private void AssertBclNodaEquality(CultureInfo culture, string patternText)
         {
@@ -234,8 +263,8 @@ namespace NodaTime.Test.Text
             }
 
             var pattern = LocalDatePattern.Create(patternText, culture);
-            var calendarSystem = CalendarSystemForCalendar(culture.Calendar);
-            if (calendarSystem == null)
+            var calendarSystem = BclCalendars.CalendarSystemForCalendar(culture.Calendar);
+            if (calendarSystem is null)
             {
                 // We can't map this calendar system correctly yet; the test would be invalid.
                 return;

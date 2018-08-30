@@ -106,16 +106,19 @@ namespace NodaTime.Test
 
         private static void AssertImpossible(LocalDateTime localTime, DateTimeZone zone)
         {
-            try
-            {
-                zone.MapLocal(localTime).Single();
-                Assert.Fail("Expected exception");
-            }
-            catch (SkippedTimeException e)
-            {
-                Assert.AreEqual(localTime, e.LocalDateTime);
-                Assert.AreEqual(zone, e.Zone);
-            }
+            var mapping = zone.MapLocal(localTime);
+            Assert.AreEqual(0, mapping.Count);
+            var e = Assert.Throws<SkippedTimeException>(() => mapping.Single());
+            Assert.AreEqual(localTime, e.LocalDateTime);
+            Assert.AreEqual(zone, e.Zone);
+            
+            e = Assert.Throws<SkippedTimeException>(() => mapping.First());
+            Assert.AreEqual(localTime, e.LocalDateTime);
+            Assert.AreEqual(zone, e.Zone);
+
+            e = Assert.Throws<SkippedTimeException>(() => mapping.Last());
+            Assert.AreEqual(localTime, e.LocalDateTime);
+            Assert.AreEqual(zone, e.Zone);
         }
 
         private static void AssertAmbiguous(LocalDateTime localTime, DateTimeZone zone)
@@ -126,23 +129,25 @@ namespace NodaTime.Test
             Assert.AreEqual(localTime, later.LocalDateTime);
             Assert.That(earlier.ToInstant(), Is.LessThan(later.ToInstant()));
 
-            try
-            {
-                zone.MapLocal(localTime).Single();
-                Assert.Fail("Expected exception");
-            }
-            catch (AmbiguousTimeException e)
-            {
-                Assert.AreEqual(localTime, e.LocalDateTime);
-                Assert.AreEqual(zone, e.Zone);
-                Assert.AreEqual(earlier, e.EarlierMapping);
-                Assert.AreEqual(later, e.LaterMapping);
-            }
+            var mapping = zone.MapLocal(localTime);
+            Assert.AreEqual(2, mapping.Count);
+            var e = Assert.Throws<AmbiguousTimeException>(() => mapping.Single());
+            Assert.AreEqual(localTime, e.LocalDateTime);
+            Assert.AreEqual(zone, e.Zone);
+            Assert.AreEqual(earlier, e.EarlierMapping);
+            Assert.AreEqual(later, e.LaterMapping);
+
+            Assert.AreEqual(earlier, mapping.First());
+            Assert.AreEqual(later, mapping.Last());
         }
 
         private static void AssertOffset(int expectedHours, LocalDateTime localTime, DateTimeZone zone)
         {
-            var zoned = zone.MapLocal(localTime).Single();
+            var mapping = zone.MapLocal(localTime);
+            Assert.AreEqual(1, mapping.Count);
+            var zoned = mapping.Single();
+            Assert.AreEqual(zoned, mapping.First());
+            Assert.AreEqual(zoned, mapping.Last());
             int actualHours = zoned.Offset.Milliseconds / NodaConstants.MillisecondsPerHour;
             Assert.AreEqual(expectedHours, actualHours);
         }
@@ -261,12 +266,12 @@ namespace NodaTime.Test
         // to 00:00:00 December 31st local time UTC+14
         [Test]
         [TestCase("Pacific/Apia", "2011-12-30")]
-        [TestCase("Pacific/Enderbury", "1995-01-01")]
-        [TestCase("Pacific/Kiritimati", "1995-01-01")]
+        [TestCase("Pacific/Enderbury", "1994-12-31")]
+        [TestCase("Pacific/Kiritimati", "1994-12-31")]
         [TestCase("Pacific/Kwajalein", "1993-08-20")]
         public void AtStartOfDay_DayDoesntExist(string zoneId, string localDate)
         {
-            LocalDate badDate = LocalDatePattern.IsoPattern.Parse(localDate).Value;
+            LocalDate badDate = LocalDatePattern.Iso.Parse(localDate).Value;
             DateTimeZone zone = DateTimeZoneProviders.Tzdb[zoneId];
             var exception = Assert.Throws<SkippedTimeException>(() => zone.AtStartOfDay(badDate));
             Assert.AreEqual(badDate + LocalTime.Midnight, exception.LocalDateTime);
@@ -280,7 +285,7 @@ namespace NodaTime.Test
             Assert.AreEqual(2009, when.Year);
             Assert.AreEqual(12, when.Month);
             Assert.AreEqual(22, when.Day);
-            Assert.AreEqual(2, when.DayOfWeek);
+            Assert.AreEqual(IsoDayOfWeek.Tuesday, when.DayOfWeek);
             Assert.AreEqual(21, when.Hour);
             Assert.AreEqual(39, when.Minute);
             Assert.AreEqual(30, when.Second);

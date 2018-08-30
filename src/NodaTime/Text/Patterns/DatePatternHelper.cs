@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.Text;
 using NodaTime.Calendars;
 using NodaTime.Globalization;
-using NodaTime.Properties;
+using System.Diagnostics.CodeAnalysis;
 
 namespace NodaTime.Text.Patterns
 {
@@ -47,7 +47,7 @@ namespace NodaTime.Text.Patterns
                             assumeFitsInCount: true);
                         break;
                     default:
-                        throw new InvalidPatternException(Messages.Parse_InvalidRepeatCount, pattern.Current, count);
+                        throw new InvalidPatternException(TextErrorMessages.InvalidRepeatCount, pattern.Current, count);
                 }
             };
         }
@@ -114,8 +114,11 @@ namespace NodaTime.Text.Patterns
                 this.getter = getter;
             }
 
+            [ExcludeFromCodeCoverage]
             internal void DummyMethod(TResult value, StringBuilder builder)
             {
+                // This method is never called. We use it to create a delegate with a target that implements
+                // IPostPatternParseFormatAction. There's no test for this throwing.
                 throw new InvalidOperationException("This method should never be called");
             }
 
@@ -200,11 +203,9 @@ namespace NodaTime.Text.Patterns
 
                 builder.AddParseAction((cursor, bucket) =>
                 {
-                    // TODO(V2.0): (Breaking change, although undocumented.) Potentially make this case-sensitive
-                    // as we're parsing IDs.
                     foreach (var id in CalendarSystem.Ids)
                     {
-                        if (cursor.MatchCaseInsensitive(id, NodaFormatInfo.InvariantInfo.CompareInfo, true))
+                        if (cursor.Match(id))
                         {
                             setter(bucket, CalendarSystem.ForId(id));
                             return null;

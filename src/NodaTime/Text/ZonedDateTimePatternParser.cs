@@ -5,7 +5,6 @@
 using System;
 using System.Collections.Generic;
 using NodaTime.Globalization;
-using NodaTime.Properties;
 using NodaTime.Text.Patterns;
 using NodaTime.TimeZones;
 
@@ -13,10 +12,7 @@ namespace NodaTime.Text
 {
     internal sealed class ZonedDateTimePatternParser : IPatternParser<ZonedDateTime>
     {
-        // Split the template value once, to avoid doing it every time we parse.
-        private readonly LocalDate templateValueDate;
-        private readonly LocalTime templateValueTime;
-        private readonly DateTimeZone templateValueZone;
+        private readonly ZonedDateTime templateValue;
         private readonly IDateTimeZoneProvider zoneProvider;
         private readonly ZoneLocalMappingResolver resolver;
 
@@ -35,7 +31,7 @@ namespace NodaTime.Text
             { 'M', DatePatternHelper.CreateMonthOfYearHandler<ZonedDateTime, ZonedDateTimeParseBucket>
                         (value => value.Month, (bucket, value) => bucket.Date.MonthOfYearText = value, (bucket, value) => bucket.Date.MonthOfYearNumeric = value) },
             { 'd', DatePatternHelper.CreateDayHandler<ZonedDateTime, ZonedDateTimeParseBucket>
-                        (value => value.Day, value => value.DayOfWeek, (bucket, value) => bucket.Date.DayOfMonth = value, (bucket, value) => bucket.Date.DayOfWeek = value) },
+                        (value => value.Day, value => (int) value.DayOfWeek, (bucket, value) => bucket.Date.DayOfMonth = value, (bucket, value) => bucket.Date.DayOfWeek = value) },
             { '.', TimePatternHelper.CreatePeriodHandler<ZonedDateTime, ZonedDateTimeParseBucket>(9, value => value.NanosecondOfSecond, (bucket, value) => bucket.Time.FractionalSeconds = value) },
             { ';', TimePatternHelper.CreateCommaDotHandler<ZonedDateTime, ZonedDateTimeParseBucket>(9, value => value.NanosecondOfSecond, (bucket, value) => bucket.Time.FractionalSeconds = value) },
             { ':', (pattern, builder) => builder.AddLiteral(builder.FormatInfo.TimeSeparator, ParseResult<ZonedDateTime>.TimeSeparatorMismatch) },
@@ -60,9 +56,7 @@ namespace NodaTime.Text
 
         internal ZonedDateTimePatternParser(ZonedDateTime templateValue, ZoneLocalMappingResolver resolver, IDateTimeZoneProvider zoneProvider)
         {
-            templateValueDate = templateValue.Date;
-            templateValueTime = templateValue.TimeOfDay;
-            templateValueZone = templateValue.Zone;
+            this.templateValue = templateValue;
             this.resolver = resolver;
             this.zoneProvider = zoneProvider;
         }
@@ -74,7 +68,7 @@ namespace NodaTime.Text
             // Nullity check is performed in ZonedDateTimePattern.
             if (patternText.Length == 0)
             {
-                throw new InvalidPatternException(Messages.Parse_FormatStringEmpty);
+                throw new InvalidPatternException(TextErrorMessages.FormatStringEmpty);
             }
 
             // Handle standard patterns
@@ -91,19 +85,19 @@ namespace NodaTime.Text
                             .WithZoneProvider(zoneProvider)
                             .WithResolver(resolver);
                     default:
-                        throw new InvalidPatternException(Messages.Parse_UnknownStandardFormat, patternText[0], typeof(ZonedDateTime));
+                        throw new InvalidPatternException(TextErrorMessages.UnknownStandardFormat, patternText[0], typeof(ZonedDateTime));
                 }
             }
 
             var patternBuilder = new SteppedPatternBuilder<ZonedDateTime, ZonedDateTimeParseBucket>(formatInfo,
-                () => new ZonedDateTimeParseBucket(templateValueDate, templateValueTime, templateValueZone, resolver, zoneProvider));
-            if (zoneProvider == null)
+                () => new ZonedDateTimeParseBucket(templateValue, resolver, zoneProvider));
+            if (zoneProvider is null || resolver is null)
             {
                 patternBuilder.SetFormatOnly();
             }
             patternBuilder.ParseCustomPattern(patternText, PatternCharacterHandlers);
             patternBuilder.ValidateUsedFields();
-            return patternBuilder.Build(templateValueDate.At(templateValueTime).InZoneLeniently(templateValueZone));
+            return patternBuilder.Build(templateValue);
         }
 
         private static void HandleZone(PatternCursor pattern,
@@ -142,12 +136,11 @@ namespace NodaTime.Text
             private readonly ZoneLocalMappingResolver resolver;
             private readonly IDateTimeZoneProvider zoneProvider;
 
-            internal ZonedDateTimeParseBucket(LocalDate templateDate, LocalTime templateTime,
-                DateTimeZone templateZone, ZoneLocalMappingResolver resolver, IDateTimeZoneProvider zoneProvider)
+            internal ZonedDateTimeParseBucket(ZonedDateTime templateValue, ZoneLocalMappingResolver resolver, IDateTimeZoneProvider zoneProvider)
             {
-                Date = new LocalDatePatternParser.LocalDateParseBucket(templateDate);
-                Time = new LocalTimePatternParser.LocalTimeParseBucket(templateTime);
-                Zone = templateZone;
+                Date = new LocalDatePatternParser.LocalDateParseBucket(templateValue.Date);
+                Time = new LocalTimePatternParser.LocalTimeParseBucket(templateValue.TimeOfDay);
+                Zone = templateValue.Zone;
                 this.resolver = resolver;
                 this.zoneProvider = zoneProvider;
             }
@@ -156,7 +149,7 @@ namespace NodaTime.Text
             {
                 DateTimeZone zone = TryParseFixedZone(value) ?? TryParseProviderZone(value);
 
-                if (zone == null)
+                if (zone is null)
                 {
                     return ParseResult<ZonedDateTime>.NoMatchingZoneId(value);
                 }
@@ -178,7 +171,7 @@ namespace NodaTime.Text
                     return null;
                 }
                 value.Move(value.Index + 3);
-                var pattern = OffsetPattern.GeneralInvariantPattern.UnderlyingPattern;
+                var pattern = OffsetPattern.GeneralInvariant.UnderlyingPattern;
                 var parseResult = pattern.ParsePartial(value);
                 return parseResult.Success ? DateTimeZone.ForOffset(parseResult.Value) : DateTimeZone.Utc;
             }
@@ -212,14 +205,39 @@ namespace NodaTime.Text
                     else
                     {
                         // We've found a match! But it may not be as long as it
-                        // could be. Keep looking until we find a value which isn't a match...
-                        while (guess + 1 < upperBound && value.CompareOrdinal(ids[guess + 1]) == 0)
+                        // could be. Keep track of a "longest match so far" (starting with the match we've found),
+                        // and keep looking through the IDs until we find an ID which doesn't start with that "longest
+                        // match so far", at which point we know we're done.
+                        //
+                        // We can't just look through all the IDs from "guess" to "lowerBound" and stop when we hit
+                        // a non-match against "value", because of situations like this:
+                        // value=Etc/GMT-12
+                        // guess=Etc/GMT-1
+                        // IDs includes { Etc/GMT-1, Etc/GMT-10, Etc/GMT-11, Etc/GMT-12, Etc/GMT-13 }
+                        // We can't stop when we hit Etc/GMT-10, because otherwise we won't find Etc/GMT-12.
+                        // We *can* stop when we get to Etc/GMT-13, because by then our longest match so far will
+                        // be Etc/GMT-12, and we know that anything beyond Etc/GMT-13 won't match that.
+                        // We can also stop when we hit upperBound, without any more comparisons.
+
+                        string longestSoFar = ids[guess];
+                        for (int i = guess + 1; i < upperBound; i++)
                         {
-                            guess++;
+                            string candidate = ids[i];
+                            if (candidate.Length < longestSoFar.Length)
+                            {
+                                break;
+                            }
+                            if (string.CompareOrdinal(longestSoFar, 0, candidate, 0, longestSoFar.Length) != 0)
+                            {
+                                break;
+                            }
+                            if (value.CompareOrdinal(candidate) == 0)
+                            {
+                                longestSoFar = candidate;
+                            }
                         }
-                        string id = ids[guess];
-                        value.Move(value.Index + id.Length);
-                        return zoneProvider[id];
+                        value.Move(value.Index + longestSoFar.Length);
+                        return zoneProvider[longestSoFar];
                     }
                 }
                 return null;

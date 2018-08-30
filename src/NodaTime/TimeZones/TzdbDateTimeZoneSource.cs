@@ -2,18 +2,19 @@
 // Use of this source code is governed by the Apache License 2.0,
 // as found in the LICENSE.txt file.
 
+using JetBrains.Annotations;
+using NodaTime.Annotations;
+using NodaTime.TimeZones.Cldr;
+using NodaTime.TimeZones.IO;
+using NodaTime.Utility;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using JetBrains.Annotations;
-using NodaTime.Annotations;
-using NodaTime.TimeZones.Cldr;
-using NodaTime.TimeZones.IO;
-using NodaTime.Utility;
 
 namespace NodaTime.TimeZones
 {
@@ -34,7 +35,7 @@ namespace NodaTime.TimeZones
         /// Gets the <see cref="TzdbDateTimeZoneSource"/> initialised from resources within the NodaTime assembly.
         /// </summary>
         /// <value>The source initialised from resources within the NodaTime assembly.</value>
-        public static TzdbDateTimeZoneSource Default => DefaultHolder.builtin;
+        [NotNull] public static TzdbDateTimeZoneSource Default => DefaultHolder.builtin;
 
         // Class to enable lazy initialization of the default instance.
         private static class DefaultHolder
@@ -74,7 +75,7 @@ namespace NodaTime.TimeZones
         /// The aliases within a group are returned in alphabetical (ordinal) order.
         /// </remarks>
         /// <value>A lookup from canonical ID to the aliases of that ID.</value>
-        public ILookup<string, string> Aliases { get; }
+        [NotNull] public ILookup<string, string> Aliases { get; }
 
         /// <summary>
         /// Returns a read-only map from time zone ID to the canonical ID. For example, the key "Europe/Jersey"
@@ -87,8 +88,7 @@ namespace NodaTime.TimeZones
         /// <see cref="NotSupportedException" />.</para>
         /// </remarks>
         /// <value>A map from time zone ID to the canonical ID.</value>
-        [NotNull]
-        public IDictionary<string, string> CanonicalIdMap { get; }
+        [NotNull] public IDictionary<string, string> CanonicalIdMap { get; }
 
         /// <summary>
         /// Gets a read-only list of zone locations known to this source, or null if the original source data
@@ -99,7 +99,7 @@ namespace NodaTime.TimeZones
         /// has been validated).
         /// </remarks>
         /// <value>A read-only list of zone locations known to this source.</value>
-        public IList<TzdbZoneLocation> ZoneLocations { get; }
+        [CanBeNull] public IList<TzdbZoneLocation> ZoneLocations { get; }
 
         /// <summary>
         /// Gets a read-only list of "zone 1970" locations known to this source, or null if the original source data
@@ -125,7 +125,7 @@ namespace NodaTime.TimeZones
         /// </p>
         /// </remarks>
         /// <value>A read-only list of zone locations known to this source.</value>
-        public IList<TzdbZone1970Location> Zone1970Locations { get; }
+        [CanBeNull] public IList<TzdbZone1970Location> Zone1970Locations { get; }
 
         /// <inheritdoc />
         /// <remarks>
@@ -138,7 +138,7 @@ namespace NodaTime.TimeZones
         /// directly from the <see cref="TzdbVersion"/> and <see cref="WindowsZones.Version"/> properties.
         /// </para>
         /// </remarks>
-        public string VersionId => "TZDB: " + version;
+        [NotNull] public string VersionId => "TZDB: " + version;
 
         /// <summary>
         /// Creates an instance from a stream in the custom Noda Time format. The stream must be readable.
@@ -159,7 +159,7 @@ namespace NodaTime.TimeZones
         /// be read by this version of Noda Time.</exception>
         /// <exception cref="IOException">Reading from the stream failed.</exception>
         /// <exception cref="InvalidOperationException">The supplied stream doesn't support reading.</exception>
-        public static TzdbDateTimeZoneSource FromStream([NotNull] Stream stream)
+        [NotNull] public static TzdbDateTimeZoneSource FromStream([NotNull] Stream stream)
         {
             Preconditions.CheckNotNull(stream, nameof(stream));
             return new TzdbDateTimeZoneSource(TzdbStreamData.FromStream(stream));
@@ -176,112 +176,120 @@ namespace NodaTime.TimeZones
                 .ToLookup(pair => pair.Value, pair => pair.Key);
             version = source.TzdbVersion + " (mapping: " + source.WindowsMapping.Version + ")";
             var originalZoneLocations = source.ZoneLocations;
-            ZoneLocations = originalZoneLocations == null ? null : new ReadOnlyCollection<TzdbZoneLocation>(originalZoneLocations);
+            ZoneLocations = originalZoneLocations is null ? null : new ReadOnlyCollection<TzdbZoneLocation>(originalZoneLocations);
             var originalZone1970Locations = source.Zone1970Locations;
-            Zone1970Locations = originalZone1970Locations == null ? null : new ReadOnlyCollection<TzdbZone1970Location>(originalZone1970Locations);
+            Zone1970Locations = originalZone1970Locations is null ? null : new ReadOnlyCollection<TzdbZone1970Location>(originalZone1970Locations);
         }
 
         /// <inheritdoc />
-        public DateTimeZone ForId([NotNull] string id)
+        [NotNull] public DateTimeZone ForId([NotNull] string id)
         {
-            string canonicalId;
-            if (!CanonicalIdMap.TryGetValue(Preconditions.CheckNotNull(id, nameof(id)), out canonicalId))
+            if (!CanonicalIdMap.TryGetValue(Preconditions.CheckNotNull(id, nameof(id)), out string canonicalId))
             {
-                throw new ArgumentException("Time zone with ID " + id + " not found in source " + version, "id");
+                throw new ArgumentException("Time zone with ID " + id + " not found in source " + version, nameof(id));
             }
             return source.CreateZone(id, canonicalId);
         }
 
         /// <inheritdoc />
         [DebuggerStepThrough]
-        public IEnumerable<string> GetIds() => CanonicalIdMap.Keys;
+        [NotNull] public IEnumerable<string> GetIds() => CanonicalIdMap.Keys;
 
         /// <inheritdoc />
-        /// <param name="timeZone">The BCL time zone, which must be a known system time zone.</param>
-        public string MapTimeZoneId([NotNull] TimeZoneInfo timeZone)
+        [CanBeNull] public string GetSystemDefaultId() => MapTimeZoneInfoId(TimeZoneInfoInterceptor.Local);
+
+        [VisibleForTesting, CanBeNull]
+        internal string MapTimeZoneInfoId([CanBeNull] TimeZoneInfo timeZone)
         {
-            Preconditions.CheckNotNull(timeZone, nameof(timeZone));
-#if PCL
-            // Our in-memory mapping is effectively from standard name to TZDB ID.
-            string id = timeZone.StandardName;
-#else
+            // Unusual, but can happen in some Mono installations.
+            if (timeZone is null)
+            {
+                return null;
+            }
             string id = timeZone.Id;
-#endif
-            string result;
-            source.WindowsMapping.PrimaryMapping.TryGetValue(id, out result);
-#if PCL
-            if (result == null)
+            // First see if it's a Windows time zone ID.
+            if (source.WindowsMapping.PrimaryMapping.TryGetValue(id, out string result))
             {
-                source.WindowsAdditionalStandardNameToIdMapping.TryGetValue(id, out result);
+                return result;
             }
-            if (result == null)
+            // Next see if it's already a TZDB ID (e.g. .NET Core running on Linux or Mac).
+            if (CanonicalIdMap.Keys.Contains(id))
             {
-                result = GuessZoneIdByTransitions(timeZone);
+                return id;
             }
-#endif
-            return result;
+            // Maybe it's a Windows zone we don't have a mapping for, or we're on a Mono system
+            // where TimeZoneInfo.Local.Id returns "Local" but can actually do the mappings.
+            return GuessZoneIdByTransitions(timeZone);
         }
 
-#if PCL
-        private readonly Dictionary<string, string> guesses = new Dictionary<string, string>();
+        private readonly ConcurrentDictionary<string, string> guesses = new ConcurrentDictionary<string, string>();
 
         // Cache around GuessZoneIdByTransitionsUncached
         private string GuessZoneIdByTransitions(TimeZoneInfo zone)
         {
-            lock (guesses)
+            // FIXME: Stop using StandardName! (We have Id now...)
+            return guesses.GetOrAdd(zone.StandardName, _ =>
             {
-                string cached;
-                if (guesses.TryGetValue(zone.StandardName, out cached))
-                {
-                    return cached;
-                }
-                string guess = GuessZoneIdByTransitionsUncached(zone);
-                guesses[zone.StandardName] = guess;
-                return guess;
-            }
+                // Build the list of candidates here instead of within the method, so that
+                // tests can pass in the same list on each iteration.
+                var candidates = CanonicalIdMap.Values.Select(ForId).ToList();
+                return GuessZoneIdByTransitionsUncached(zone, candidates);
+            });
         }
-#endif
 
         /// <summary>
-        /// In cases where we can't get a zone mapping, either because we haven't kept
-        /// up to date with the standard names or because the system language isn't English,
-        /// try to work out the TZDB mapping by the transitions within the next few years.
-        /// We only do this for the PCL, where we can't ask a TimeZoneInfo for its ID. Unfortunately
-        /// this means we may sometimes return a mapping for zones which shouldn't be mapped at all, but that's
-        /// probably okay and we return null if we don't get a 70% hit rate anyway. We look at all
-        /// transitions in all primary mappings for the next year.
+        /// In cases where we can't get a zone mapping directly, we try to work out a good fit
+        /// by checking the transitions within the next few years.
+        /// This can happen if the Windows data isn't up-to-date, or if we're on a system where
+        /// TimeZoneInfo.Local.Id just returns "local", or if TimeZoneInfo.Local is a custom time
+        /// zone for some reason. We return null if we don't get a 70% hit rate.
+        /// We look at all transitions in all canonical IDs for the next 5 years.
         /// Heuristically, this seems to be good enough to get the right results in most cases.
+        /// This method used to only be called in the PCL build in 1.x, but it seems reasonable enough to
+        /// call it if we can't get an exact match anyway.
         /// </summary>
-        /// <remarks>This method is not PCL-only as we would like to test it frequently. It will
-        /// never actually be called in the non-PCL release though.</remarks>
         /// <param name="zone">Zone to resolve in a best-effort fashion.</param>
-        internal string GuessZoneIdByTransitionsUncached(TimeZoneInfo zone)
+        /// <param name="candidates">All the Noda Time zones to consider - normally a list 
+        /// obtained from this source.</param>
+        internal string GuessZoneIdByTransitionsUncached(TimeZoneInfo zone, List<DateTimeZone> candidates)
         {
+            // See https://github.com/nodatime/nodatime/issues/686 for performance observations.
             // Very rare use of the system clock! Windows time zone updates sometimes sacrifice past
             // accuracy for future accuracy, so let's use the current year's transitions.
             int thisYear = SystemClock.Instance.GetCurrentInstant().InUtc().Year;
             Instant startOfThisYear = Instant.FromUtc(thisYear, 1, 1, 0, 0);
-            Instant startOfNextYear = Instant.FromUtc(thisYear + 1, 1, 1, 0, 0);
-            var candidates = WindowsMapping.PrimaryMapping.Values.Select(ForId).ToList();
-            // Would create a HashSet directly, but it appears not to be present on all versions of the PCL...
+            Instant startOfNextYear = Instant.FromUtc(thisYear + 5, 1, 1, 0, 0);
             var instants = candidates.SelectMany(z => z.GetZoneIntervals(startOfThisYear, startOfNextYear))
                                      .Select(zi => Instant.Max(zi.RawStart, startOfThisYear)) // Clamp to start of interval
                                      .Distinct()
                                      .ToList();
-
-            int bestScore = -1;
+            var bclOffsets = instants.Select(instant => Offset.FromTimeSpan(zone.GetUtcOffset(instant.ToDateTimeUtc()))).ToList();
+            // For a zone to be mappable, at most 30% of the checks must fail
+            // - so if we get to that number (or whatever our "best" so far is)
+            // we know we can stop for any particular zone.
+            int lowestFailureScore = (instants.Count * 30) / 100;
             DateTimeZone bestZone = null;
             foreach (var candidate in candidates)
             {
-                int score = instants.Count(instant => Offset.FromTimeSpan(zone.GetUtcOffset(instant.ToDateTimeUtc())) == candidate.GetUtcOffset(instant));
-                if (score > bestScore)
+                int failureScore = 0;
+                for (int i = 0; i < instants.Count; i++)
                 {
-                    bestScore = score;
+                    if (candidate.GetUtcOffset(instants[i]) != bclOffsets[i])
+                    {
+                        failureScore++;
+                        if (failureScore == lowestFailureScore)
+                        {
+                            break;
+                        }
+                    }
+                }
+                if (failureScore < lowestFailureScore)
+                {
+                    lowestFailureScore = failureScore;
                     bestZone = candidate;
                 }
             }
-            // If we haven't hit at least 70%, it's effectively unmappable
-            return bestScore * 100 / instants.Count > 70 ? bestZone.Id : null;
+            return bestZone?.Id;
         }
 
         /// <summary>
@@ -315,8 +323,7 @@ namespace NodaTime.TimeZones
             // should be such that y maps to itself.)
             foreach (var entry in this.CanonicalIdMap)
             {
-                string canonical;
-                if (!CanonicalIdMap.TryGetValue(entry.Value, out canonical))
+                if (!CanonicalIdMap.TryGetValue(entry.Value, out string canonical))
                 {
                     throw new InvalidNodaDataException(
                         "Mapping for entry {entry.Key} ({entry.Value}) is missing");
@@ -348,20 +355,6 @@ namespace NodaTime.TimeZones
                     {
                         throw new InvalidNodaDataException(
                             $"Windows mapping uses canonical ID {id} which is missing");
-                    }
-                }
-            }
-
-            // Check that each additional Windows standard name mapping has a known canonical ID.
-            var additionalMappings = source.WindowsAdditionalStandardNameToIdMapping;
-            if (additionalMappings != null)
-            {
-                foreach (var id in additionalMappings.Values)
-                {
-                    if (!CanonicalIdMap.ContainsKey(id))
-                    {
-                        throw new InvalidNodaDataException(
-                            $"Windows additional standard name mapping uses canonical ID {id} which is missing");
                     }
                 }
             }

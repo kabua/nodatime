@@ -39,7 +39,6 @@ namespace NodaTime.TimeZones
                    ComputeOffset(intervals, tailZone, Offset.Min),
                    ComputeOffset(intervals, tailZone, Offset.Max))
         {
-            this.tailZone = tailZone;
             this.periods = intervals;
             this.tailZone = tailZone;
             this.tailZoneStart = intervals[intervals.Length - 1].RawEnd; // We want this to be AfterMaxValue for tail-less zones.
@@ -110,23 +109,6 @@ namespace NodaTime.TimeZones
             throw new InvalidOperationException($"Instant {instant} did not exist in time zone {Id}");
         }
 
-        // TODO(2.0): Revisit this, given that it's useless at the moment.
-        /// <summary>
-        /// Returns true if this time zone is worth caching. Small time zones or time zones with
-        /// lots of quick changes do not work well with <see cref="CachedDateTimeZone"/>.
-        /// </summary>
-        /// <returns><c>true</c> if this instance is cachable; otherwise, <c>false</c>.</returns>
-        public bool IsCachable() =>
-            // TODO: Work out some decent rules for this. Previously we would only cache if the
-            // tail zone was non-null... which was *always* the case due to the use of NullDateTimeZone.
-            // We could potentially go back to returning tailZone != null - benchmarking required.
-            true;
-
-        public DateTimeZone MaybeCreateCachedZone()
-        {
-            return IsCachable() ? CachedDateTimeZone.ForZone(this) : this;
-        }
-
         #region I/O
         /// <summary>
         /// Writes the time zone to the specified writer.
@@ -152,7 +134,7 @@ namespace NodaTime.TimeZones
             writer.WriteZoneIntervalTransition(previous, tailZoneStart);
             // We could just check whether we've got to the end of the stream, but this
             // feels slightly safer.
-            writer.WriteByte((byte) (tailZone == null ? 0 : 1));
+            writer.WriteByte((byte) (tailZone is null ? 0 : 1));
             if (tailZone != null)
             {
                 // This is the only kind of zone we support in the new format. Enforce that...
@@ -217,44 +199,6 @@ namespace NodaTime.TimeZones
             }
             return ret;
         }
-        #endregion
-
-        protected override bool EqualsImpl(DateTimeZone zone)
-        {
-            PrecalculatedDateTimeZone otherZone = (PrecalculatedDateTimeZone)zone;
-
-            // Check the individual fields first...
-            if (Id != otherZone.Id ||
-                !Equals(tailZone, otherZone.tailZone) ||
-                tailZoneStart != otherZone.tailZoneStart ||
-                !Equals(firstTailZoneInterval, otherZone.firstTailZoneInterval))
-            {
-                return false;
-            }
-
-            // Now all the intervals
-            if (periods.Length != otherZone.periods.Length)
-            {
-                return false;
-            }
-            for (int i = 0; i < periods.Length; i++)
-            {
-                if (!periods[i].Equals(otherZone.periods[i]))
-                {
-                    return false;
-                }
-            }
-            return true;                        
-        }
-
-        public override int GetHashCode()
-        {
-            var hash = HashCodeHelper.Initialize().Hash(Id).Hash(tailZoneStart).Hash(firstTailZoneInterval).Hash(tailZone);
-            foreach (var period in periods)
-            {
-                hash = hash.Hash(period);
-            }
-            return hash.Value;
-        }
+        #endregion        
     }
 }

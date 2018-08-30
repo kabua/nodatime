@@ -40,7 +40,7 @@ namespace NodaTime.TimeZones
         /// contributions.
         /// </summary>
         /// <remarks>
-        /// This is effectively <c>Offset - Savings</c>.
+        /// This is effectively <c>WallOffset - Savings</c>.
         /// </remarks>
         /// <value>The base Offset.</value>
         public Offset StandardOffset
@@ -91,14 +91,15 @@ namespace NodaTime.TimeZones
         /// extends to the end of time.</value>
         public bool HasEnd => RawEnd.IsValid;
 
-        // TODO(2.0): Consider whether we need some way of checking whether IsoLocalStart/End will throw.
+        // TODO(feature): Consider whether we need some way of checking whether IsoLocalStart/End will throw.
         // Clients can check HasStart/HasEnd for infinity, but what about unrepresentable local values?
 
         /// <summary>
         /// Gets the local start time of the interval, as a <see cref="LocalDateTime" />
         /// in the ISO calendar.
         /// </summary>
-        /// <value>The local start time of the interval in the ISO calendar.</value>
+        /// <value>The local start time of the interval in the ISO calendar, with the offset of
+        /// this zone interval.</value>
         /// <exception cref="OverflowException">The interval starts too early to represent as a `LocalDateTime`.</exception>
         /// <exception cref="InvalidOperationException">The interval extends to the start of time.</exception>
         public LocalDateTime IsoLocalStart
@@ -112,7 +113,10 @@ namespace NodaTime.TimeZones
         /// Gets the local end time of the interval, as a <see cref="LocalDateTime" />
         /// in the ISO calendar.
         /// </summary>
-        /// <value>The local end time of the interval in the ISO calendar.</value>
+        /// <value>The local end time of the interval in the ISO calendar, with the offset
+        /// of this zone interval. As the end time is exclusive, by the time this local time
+        /// is reached, the next interval will be in effect and the local time will usually
+        /// have changed (e.g. by adding or subtracting an hour).</value>
         /// <exception cref="OverflowException">The interval ends too late to represent as a `LocalDateTime`.</exception>
         /// <exception cref="InvalidOperationException">The interval extends to the end of time.</exception>
         public LocalDateTime IsoLocalEnd
@@ -127,7 +131,7 @@ namespace NodaTime.TimeZones
         /// Gets the name of this offset period (e.g. PST or PDT).
         /// </summary>
         /// <value>The name of this offset period (e.g. PST or PDT).</value>
-        public string Name { [DebuggerStepThrough] get; }
+        [NotNull] public string Name { [DebuggerStepThrough] get; }
 
         /// <summary>
         /// Gets the offset from UTC for this period. This includes any daylight savings value.
@@ -154,9 +158,6 @@ namespace NodaTime.TimeZones
                 return RawStart;
             }
         }
-
-        // TODO(2.0): Consider changing the fourth parameter of the constructors to accept standard time rather than the wall offset. It's very
-        // inconsistent with everything else...
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ZoneInterval" /> class.
@@ -263,7 +264,7 @@ namespace NodaTime.TimeZones
         [DebuggerStepThrough]
         public bool Equals(ZoneInterval other)
         {
-            if (ReferenceEquals(null, other))
+            if (other is null)
             {
                 return false;
             }
@@ -302,7 +303,7 @@ namespace NodaTime.TimeZones
                 .Hash(RawEnd)
                 .Hash(WallOffset)
                 .Hash(Savings)
-                .Value;    
+                .Value;
 
         /// <summary>
         ///   Returns a <see cref="System.String" /> that represents this instance.

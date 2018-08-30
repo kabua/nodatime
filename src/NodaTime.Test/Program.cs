@@ -1,16 +1,16 @@
+// Copyright 2017 The Noda Time Authors. All rights reserved.
+// Use of this source code is governed by the Apache License 2.0,
+// as found in the LICENSE.txt file.
 using NUnitLite;
+using System.Reflection;
 
 namespace NodaTime.Test
 {
-    public class Program
+    class Program
     {
-        public int Main(string[] args)
+        public static int Main(string[] args)
         {
-#if DNX451
-            return new AutoRun().Execute(args);
-#else
-            return new AutoRun().Execute(typeof(Program).GetTypeInfo().Assembly, Console.Out, Console.In, args);
-#endif
+            return new AutoRun(typeof(Program).GetTypeInfo().Assembly).Execute(args);
         }
     }
 }

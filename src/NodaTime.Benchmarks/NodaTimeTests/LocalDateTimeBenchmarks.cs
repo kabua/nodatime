@@ -9,7 +9,6 @@ using NodaTime.Calendars;
 
 namespace NodaTime.Benchmarks.NodaTimeTests
 {
-    [Config(typeof(BenchmarkConfig))]
     public class LocalDateTimeBenchmarks
     {
         private static readonly DateTime SampleDateTime = new DateTime(2009, 12, 26, 10, 8, 30);
@@ -26,10 +25,10 @@ namespace NodaTime.Benchmarks.NodaTimeTests
         public LocalDateTime ConstructionToSecond() => new LocalDateTime(2009, 12, 26, 10, 8, 30);
 
         [Benchmark]
-        public LocalDateTime ConstructionToTick() => new LocalDateTime(2009, 12, 26, 10, 8, 30, 0, 0);
+        public LocalDateTime FromDateTime() => LocalDateTime.FromDateTime(SampleDateTime);
 
         [Benchmark]
-        public LocalDateTime FromDateTime() => LocalDateTime.FromDateTime(SampleDateTime);
+        public LocalDateTime FromDateTime_WithCalendar() => LocalDateTime.FromDateTime(SampleDateTime, CalendarSystem.Julian);
 
         [Benchmark]
         public DateTime ToDateTimeUnspecified() => Sample.ToDateTimeUnspecified();
@@ -44,7 +43,7 @@ namespace NodaTime.Benchmarks.NodaTimeTests
         public int DayOfMonth() => Sample.Day;
 
         [Benchmark]
-        public IsoDayOfWeek IsoDayOfWeek() => Sample.IsoDayOfWeek;
+        public IsoDayOfWeek DayOfWeek() => Sample.DayOfWeek;
 
         [Benchmark]
         public int DayOfYear() => Sample.DayOfYear;
@@ -148,11 +147,14 @@ namespace NodaTime.Benchmarks.NodaTimeTests
         public LocalDateTime MinusMixedPeriod() => (Sample - SampleMixedPeriod);
 
 #if !NO_INTERNALS
-        //        [Benchmark]
-        //        public LocalInstant ToLocalInstant()
-        //        {
-        //            return Sample.ToLocalInstant();
-        //        }
+        [Benchmark]
+        public LocalInstantWrapper ToLocalInstant() => new LocalInstantWrapper(Sample.ToLocalInstant());
+
+        public struct LocalInstantWrapper
+        {
+            private readonly LocalInstant value;
+            internal LocalInstantWrapper(LocalInstant value) => this.value = value;
+        }
 #endif
     }
 }

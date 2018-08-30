@@ -2,7 +2,6 @@
 // Use of this source code is governed by the Apache License 2.0,
 // as found in the LICENSE.txt file.
 
-using System.ComponentModel;
 using NodaTime.Text;
 using System.Globalization;
 using BenchmarkDotNet.Attributes;
@@ -11,7 +10,6 @@ using BenchmarkDotNet.Attributes;
 
 namespace NodaTime.Benchmarks.NodaTimeTests.Text
 {
-    [Config(typeof(BenchmarkConfig))]
     [Category("Text")]
     public class OffsetDateTimePatternBenchmarks
     {
@@ -46,21 +44,21 @@ namespace NodaTime.Benchmarks.NodaTimeTests.Text
         [Benchmark]
         public void FormatIso()
         {
-            OffsetDateTimePattern.ExtendedIsoPattern.Format(SampleOffsetDateTime);
+            OffsetDateTimePattern.ExtendedIso.Format(SampleOffsetDateTime);
         }
 
 #if !V1
         [Benchmark]
         public void ParseIso_NanosecondPrecision()
         {
-            OffsetDateTimePattern.ExtendedIsoPattern.Parse("2014-08-01T13:46:12.123456789+02").GetValueOrThrow();
+            OffsetDateTimePattern.ExtendedIso.Parse("2014-08-01T13:46:12.123456789+02").GetValueOrThrow();
         }
 #endif
 
         [Benchmark]
         public void ParseIso_SecondPrecision()
         {
-            OffsetDateTimePattern.ExtendedIsoPattern.Parse("2014-08-01T13:46:12+02").GetValueOrThrow();
+            OffsetDateTimePattern.ExtendedIso.Parse("2014-08-01T13:46:12+02").GetValueOrThrow();
         }
     }
 }

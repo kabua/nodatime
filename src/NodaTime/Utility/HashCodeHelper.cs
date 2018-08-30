@@ -16,7 +16,7 @@ namespace NodaTime.Utility
     /// </code>
     /// </example>
     /// </remarks>
-    internal struct HashCodeHelper
+    internal readonly struct HashCodeHelper
     {
         /// <summary>
         /// The multiplier for each value.
@@ -80,7 +80,7 @@ namespace NodaTime.Utility
         {
             unchecked
             {
-                return new HashCodeHelper(Value * HashCodeMultiplier + value?.GetHashCode() ?? 0);
+                return new HashCodeHelper(Value * HashCodeMultiplier + (value?.GetHashCode() ?? 0));
             }
         }
     }

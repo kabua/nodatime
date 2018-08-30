@@ -4,13 +4,11 @@
 
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Globalization;
 using BenchmarkDotNet.Attributes;
 
 namespace NodaTime.Benchmarks.BclTests
 {
-    [Config(typeof(BenchmarkConfig))]
     [Category("BCL")]
     public class DateTimeOffsetBenchmarks
     {

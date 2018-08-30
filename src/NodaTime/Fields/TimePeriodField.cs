@@ -25,13 +25,15 @@ namespace NodaTime.Fields
         internal static readonly TimePeriodField Hours = new TimePeriodField(NanosecondsPerHour);
 
         private readonly long unitNanoseconds;
-
-        public long UnitsPerDay { get; }
+        // The largest number of units (positive or negative) we can multiply unitNanoseconds by without overflowing a long.
+        private readonly long maxLongUnits;
+        private readonly long unitsPerDay;
 
         private TimePeriodField(long unitNanoseconds)
         {
             this.unitNanoseconds = unitNanoseconds;
-            UnitsPerDay = NanosecondsPerDay / unitNanoseconds;
+            maxLongUnits = long.MaxValue / unitNanoseconds;
+            unitsPerDay = NanosecondsPerDay / unitNanoseconds;
         }
 
         internal LocalDateTime Add(LocalDateTime start, long units)
@@ -51,9 +53,9 @@ namespace NodaTime.Fields
                 // into a day, so we can make sure we add a value which is less than a day.
                 if (value >= 0)
                 {
-                    if (value >= UnitsPerDay)
+                    if (value >= unitsPerDay)
                     {
-                        value = value % UnitsPerDay;
+                        value = value % unitsPerDay;
                     }
                     long nanosToAdd = value * unitNanoseconds;
                     long newNanos = localTime.NanosecondOfDay + nanosToAdd;
@@ -65,9 +67,9 @@ namespace NodaTime.Fields
                 }
                 else
                 {
-                    if (value <= -UnitsPerDay)
+                    if (value <= -unitsPerDay)
                     {
-                        value = value % UnitsPerDay;
+                        value = value % unitsPerDay;
                     }
                     long nanosToAdd = value * unitNanoseconds;
                     long newNanos = localTime.NanosecondOfDay + nanosToAdd;
@@ -92,12 +94,12 @@ namespace NodaTime.Fields
                 // It's possible that there are better ways to do this, but this at least feels simple.
                 if (value >= 0)
                 {
-                    if (value >= UnitsPerDay)
+                    if (value >= unitsPerDay)
                     {
-                        long longDays = value / UnitsPerDay;
+                        long longDays = value / unitsPerDay;
                         // If this overflows, that's fine. (An OverflowException is a reasonable outcome.)
                         days = checked ((int) longDays);
-                        value = value % UnitsPerDay;
+                        value = value % unitsPerDay;
                     }
                     long nanosToAdd = value * unitNanoseconds;
                     long newNanos = localTime.NanosecondOfDay + nanosToAdd;
@@ -111,12 +113,12 @@ namespace NodaTime.Fields
                 }
                 else
                 {
-                    if (value <= -UnitsPerDay)
+                    if (value <= -unitsPerDay)
                     {
-                        long longDays = value / UnitsPerDay;
+                        long longDays = value / unitsPerDay;
                         // If this overflows, that's fine. (An OverflowException is a reasonable outcome.)
                         days = checked((int) longDays);
-                        value = value % UnitsPerDay;
+                        value = value % unitsPerDay;
                     }
                     long nanosToAdd = value * unitNanoseconds;
                     long newNanos = localTime.NanosecondOfDay + nanosToAdd;
@@ -131,19 +133,28 @@ namespace NodaTime.Fields
             }
         }
 
-        public long Subtract(LocalTime minuendTime, LocalTime subtrahendTime)
+        internal long UnitsBetween(LocalDateTime start, LocalDateTime end)
         {
-            if (minuendTime.NanosecondOfDay < subtrahendTime.NanosecondOfDay)
-            {
-                return -Subtract(subtrahendTime, minuendTime);
-            }
-            unchecked
-            {
-                // We know this won't overflow, as the result must be smallish and positive.
-                long nanoseconds = (minuendTime.NanosecondOfDay - subtrahendTime.NanosecondOfDay);
-                // This will naturally truncate towards 0, which is what we want.
-                return nanoseconds / unitNanoseconds;
-            }
+            LocalInstant startLocalInstant = start.ToLocalInstant();
+            LocalInstant endLocalInstant = end.ToLocalInstant();
+            Duration duration = endLocalInstant.TimeSinceLocalEpoch - startLocalInstant.TimeSinceLocalEpoch;
+            return GetUnitsInDuration(duration);
         }
+
+        /// <summary>
+        /// Returns the number of units in the given duration, rounding towards zero.
+        /// </summary>
+        internal long GetUnitsInDuration(Duration duration) =>
+            duration.IsInt64Representable
+            ? duration.ToInt64Nanoseconds() / unitNanoseconds
+            : (long)(duration.ToDecimalNanoseconds() / unitNanoseconds);
+
+        /// <summary>
+        /// Returns a <see cref="Duration"/> representing the given number of units.
+        /// </summary>
+        internal Duration ToDuration(long units) =>
+            units >= -maxLongUnits && units <= maxLongUnits
+            ? Duration.FromNanoseconds(units * unitNanoseconds)
+            : Duration.FromNanoseconds(units * (decimal)unitNanoseconds);
     }
 }

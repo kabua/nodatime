@@ -10,8 +10,8 @@ namespace NodaTime.Test
 {
     public class IntervalTest
     {
-        private static readonly Instant SampleStart = Instant.FromUnixTimeTicks(-300);
-        private static readonly Instant SampleEnd = Instant.FromUnixTimeTicks(400);
+        private static readonly Instant SampleStart = NodaConstants.UnixEpoch.PlusNanoseconds(-30001);
+        private static readonly Instant SampleEnd = NodaConstants.UnixEpoch.PlusNanoseconds(40001);
 
         [Test]
         public void Construction_Success()
@@ -34,6 +34,7 @@ namespace NodaTime.Test
         public void Construction_EndBeforeStart()
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => new Interval(SampleEnd, SampleStart));
+            Assert.Throws<ArgumentOutOfRangeException>(() => new Interval((Instant?) SampleEnd, (Instant?) SampleStart));
         }
 
         [Test]
@@ -70,7 +71,7 @@ namespace NodaTime.Test
         public void Duration()
         {
             var interval = new Interval(SampleStart, SampleEnd);
-            Assert.AreEqual(NodaTime.Duration.FromTicks(700), interval.Duration);
+            Assert.AreEqual(NodaTime.Duration.FromNanoseconds(70002), interval.Duration);
         }
 
         /// <summary>
@@ -82,23 +83,14 @@ namespace NodaTime.Test
             var actual = new Interval();
             Assert.AreEqual(NodaTime.Duration.Zero, actual.Duration);
         }
-
-        [Test]
-        public void BinarySerialization()
-        {
-            TestHelper.AssertBinaryRoundtrip(new Interval(SampleStart, SampleEnd));
-            TestHelper.AssertBinaryRoundtrip(new Interval(null, SampleEnd));
-            TestHelper.AssertBinaryRoundtrip(new Interval(SampleStart, null));
-            TestHelper.AssertBinaryRoundtrip(new Interval(null, null));
-        }
-
+        
         [Test]
         public void ToStringUsesExtendedIsoFormat()
         {
-            var start = new LocalDateTime(2013, 4, 12, 17, 53, 23, 123, 4567).InUtc().ToInstant();
+            var start = new LocalDateTime(2013, 4, 12, 17, 53, 23).PlusNanoseconds(123456789).InUtc().ToInstant();
             var end = new LocalDateTime(2013, 10, 12, 17, 1, 2, 120).InUtc().ToInstant();
             var value = new Interval(start, end);
-            Assert.AreEqual("2013-04-12T17:53:23.1234567Z/2013-10-12T17:01:02.12Z", value.ToString());
+            Assert.AreEqual("2013-04-12T17:53:23.123456789Z/2013-10-12T17:01:02.12Z", value.ToString());
         }
 
         [Test]
@@ -111,10 +103,10 @@ namespace NodaTime.Test
         [Test]
         public void XmlSerialization()
         {
-            var start = new LocalDateTime(2013, 4, 12, 17, 53, 23, 123, 4567).InUtc().ToInstant();
+            var start = new LocalDateTime(2013, 4, 12, 17, 53, 23).PlusNanoseconds(123456789).InUtc().ToInstant();
             var end = new LocalDateTime(2013, 10, 12, 17, 1, 2).InUtc().ToInstant();
             var value = new Interval(start, end);
-            TestHelper.AssertXmlRoundtrip(value, "<value start=\"2013-04-12T17:53:23.1234567Z\" end=\"2013-10-12T17:01:02Z\" />");
+            TestHelper.AssertXmlRoundtrip(value, "<value start=\"2013-04-12T17:53:23.123456789Z\" end=\"2013-10-12T17:01:02Z\" />");
         }
 
         [Test]
@@ -127,20 +119,20 @@ namespace NodaTime.Test
         [Test]
         public void XmlSerialization_ExtraContent()
         {
-            var start = new LocalDateTime(2013, 4, 12, 17, 53, 23, 123, 4567).InUtc().ToInstant();
+            var start = new LocalDateTime(2013, 4, 12, 17, 53, 23).PlusNanoseconds(123456789).InUtc().ToInstant();
             var end = new LocalDateTime(2013, 10, 12, 17, 1, 2).InUtc().ToInstant();
             var value = new Interval(start, end);
             TestHelper.AssertParsableXml(value,
-                "<value start=\"2013-04-12T17:53:23.1234567Z\" end=\"2013-10-12T17:01:02Z\">Text<child attr=\"value\"/>Text 2</value>");
+                "<value start=\"2013-04-12T17:53:23.123456789Z\" end=\"2013-10-12T17:01:02Z\">Text<child attr=\"value\"/>Text 2</value>");
         }
 
         [Test]
         public void XmlSerialization_SwapAttributeOrder()
         {
-            var start = new LocalDateTime(2013, 4, 12, 17, 53, 23, 123, 4567).InUtc().ToInstant();
+            var start = new LocalDateTime(2013, 4, 12, 17, 53, 23).PlusNanoseconds(123456789).InUtc().ToInstant();
             var end = new LocalDateTime(2013, 10, 12, 17, 1, 2).InUtc().ToInstant();
             var value = new Interval(start, end);
-            TestHelper.AssertParsableXml(value, "<value end=\"2013-10-12T17:01:02Z\" start=\"2013-04-12T17:53:23.1234567Z\" />");
+            TestHelper.AssertParsableXml(value, "<value end=\"2013-10-12T17:01:02Z\" start=\"2013-04-12T17:53:23.123456789Z\" />");
         }
 
         [Test]
@@ -189,7 +181,7 @@ namespace NodaTime.Test
             var start = Instant.FromUtc(2000, 1, 1, 0, 0);
             var end = Instant.FromUtc(2020, 1, 1, 0, 0);
             var interval = new Interval(start, end);
-            var candidate = InstantPattern.ExtendedIsoPattern.Parse(candidateText).Value;
+            var candidate = InstantPattern.ExtendedIso.Parse(candidateText).Value;
             Assert.AreEqual(expectedResult, interval.Contains(candidate));
         }
 
@@ -246,6 +238,54 @@ namespace NodaTime.Test
             var interval = new Interval(instant, instant);
             // This would have been true under Noda Time 1.x
             Assert.IsFalse(interval.Contains(instant));
+        }
+
+        [Test]
+        public void Deconstruction()
+        {
+            var start = new Instant();
+            var end = start.PlusTicks(1_000_000);
+            var value = new Interval(start, end);
+
+            (Instant? actualStart, Instant? actualEnd) = value;
+
+            Assert.Multiple(() =>
+            {
+                Assert.AreEqual(start, actualStart);
+                Assert.AreEqual(end, actualEnd);
+            });
+        }
+        
+        [Test]
+        public void Deconstruction_IntervalWithoutStart()
+        {
+            Instant? start = null;
+            var end = new Instant(1500, 1_000_000);
+            var value = new Interval(start, end);
+
+            (Instant? actualStart, Instant? actualEnd) = value;
+
+            Assert.Multiple(() =>
+            {
+                Assert.AreEqual(start, actualStart);
+                Assert.AreEqual(end, actualEnd);
+            });
+        }
+
+        [Test]
+        public void Deconstruction_IntervalWithoutEnd()
+        {
+            var start = new Instant(1500, 1_000_000);
+            Instant? end = null;
+            var value = new Interval(start, end);
+
+            (Instant? actualStart, Instant? actualEnd) = value;
+
+            Assert.Multiple(() =>
+            {
+                Assert.AreEqual(start, actualStart);
+                Assert.AreEqual(end, actualEnd);
+            });
         }
     }
 }

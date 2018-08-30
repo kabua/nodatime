@@ -1,14 +1,17 @@
-﻿using JetBrains.Annotations;
+﻿// Copyright 2016 The Noda Time Authors. All rights reserved.
+// Use of this source code is governed by the Apache License 2.0,
+// as found in the LICENSE.txt file.
+
+using JetBrains.Annotations;
 using NodaTime.Utility;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace NodaTime.Calendars
 {
     /// <summary>
     /// A rule determining how "week years" are arranged, including the weeks within the week year.
+    /// Implementations provided by Noda Time itself can be obtained via the <see cref="WeekYearRules"/>
+    /// class.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -41,8 +44,6 @@ namespace NodaTime.Calendars
     /// contains calendar information, and there is no method to obtain the day-of-week as that is not affected by the
     /// week year rule being used.
     /// </para>
-    /// <para>Specific rules are obtained using the static factory methods within this class, or with the
-    /// <see cref="Iso"/> property.</para>
     /// <para>
     /// All implementations within Noda Time are immutable, and it is advised that any external implementations
     /// should be immutable too.
@@ -57,9 +58,9 @@ namespace NodaTime.Calendars
         /// <remarks>
         /// <para>
         /// Wherever reasonable, implementations should ensure that all valid dates
-        /// can be constructed via this method. In other words, given a <see cref="LocalDate"/> <code>date</code>,
-        /// <code>rule.GetLocalDate(rule.GetWeekYear(date), rule.GetWeekOfWeekYear(date), date.IsoDayOfWeek, date.Calendar)</code>
-        /// should always return <code>date</code>. This is true for all rules within Noda Time, but third party
+        /// can be constructed via this method. In other words, given a <see cref="LocalDate"/> <c>date</c>,
+        /// <c>rule.GetLocalDate(rule.GetWeekYear(date), rule.GetWeekOfWeekYear(date), date.IsoDayOfWeek, date.Calendar)</c>
+        /// should always return <c>date</c>. This is true for all rules within Noda Time, but third party
         /// implementations may choose to simplify their implementations by restricting them to appropriate portions
         /// of time.
         /// </para>
@@ -128,7 +129,7 @@ namespace NodaTime.Calendars
             Preconditions.CheckNotNull(rule, nameof(rule)).GetLocalDate(weekYear, weekOfWeekYear, dayOfWeek, CalendarSystem.Iso);
 
         /// <summary>
-        /// Convenience overload to call <see cref="GetWeeksInWeekYear(int, CalendarSystem)"/> with
+        /// Convenience overload to call <see cref="IWeekYearRule.GetWeeksInWeekYear(int, CalendarSystem)"/> with
         /// the ISO calendar system.
         /// </summary>
         /// <param name="rule">The rule to delegate the call to.</param>

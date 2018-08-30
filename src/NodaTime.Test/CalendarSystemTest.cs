@@ -4,14 +4,14 @@
 
 using System.Collections.Generic;
 using System.Linq;
-using NodaTime.Calendars;
+using System.Reflection;
 using NUnit.Framework;
 
 namespace NodaTime.Test
 {
     public partial class CalendarSystemTest
     {
-        private static readonly IEnumerable<string> SupportedIds = CalendarSystem.Ids.Where(x => x != "Um Al Qura" || UmAlQuraYearMonthDayCalculator.IsSupported).ToList();
+        private static readonly IEnumerable<string> SupportedIds = CalendarSystem.Ids.ToList();
         private static readonly List<CalendarSystem> SupportedCalendars = SupportedIds.Select(CalendarSystem.ForId).ToList();
 
         [Test]
@@ -37,7 +37,7 @@ namespace NodaTime.Test
             var localDate = new LocalDate(daysSinceEpoch, calendar);
             Assert.AreEqual(expectedYear, localDate.Year);
 
-            foreach (var property in typeof(LocalDate).GetProperties())
+            foreach (var property in typeof(LocalDate).GetTypeInfo().DeclaredProperties)
             {
                 property.GetValue(localDate, null);
             }

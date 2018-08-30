@@ -7,8 +7,8 @@ using System;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Text.RegularExpressions;
+using System.Net.Http;
 
 namespace NodaTime.TzdbCompiler.Tzdb
 {
@@ -115,9 +115,11 @@ namespace NodaTime.TzdbCompiler.Tzdb
             {
                 log?.WriteLine($"Downloading {path}");
                 Uri uri = new Uri(path);
-                using (WebClient client = new WebClient())
+                using (HttpClient client = new HttpClient())
                 {
-                    var data = client.DownloadData(path);
+                    // I know using .Result is nasty, but we're in a console app, and nothing is
+                    // going to deadlock...
+                    var data = client.GetAsync(path).Result.EnsureSuccessStatusCode().Content.ReadAsByteArrayAsync().Result;
                     log?.WriteLine($"Compiling from archive");
                     return FileSource.FromArchive(new MemoryStream(data), uri.AbsolutePath);
                 }
@@ -143,7 +145,7 @@ namespace NodaTime.TzdbCompiler.Tzdb
             {
                 foreach (var line in source.ReadLines(Makefile))
                 {
-                    if (line.StartsWith("VERSION="))
+                    if (Regex.IsMatch(line, @"VERSION=\d{4}.*"))
                     {
                         var version = line.Substring(8).Trim();
                         log?.WriteLine($"Inferred version {version} from {Makefile}");

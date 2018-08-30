@@ -26,13 +26,15 @@ namespace NodaTime.Text
         /// <summary>
         /// The "general" offset pattern (e.g. +HH, +HH:mm, +HH:mm:ss, +HH:mm:ss.fff) for the invariant culture.
         /// </summary>
-        public static OffsetPattern GeneralInvariantPattern { get; } = CreateWithInvariantCulture("g");
+        /// <value>The "general" offset pattern for the invariant culture.</value>
+        [NotNull] public static OffsetPattern GeneralInvariant { get; } = CreateWithInvariantCulture("g");
 
         /// <summary>
         /// The "general" offset pattern (e.g. +HH, +HH:mm, +HH:mm:ss, +HH:mm:ss.fff) for the invariant culture,
         /// but producing (and allowing) Z as a value for a zero offset.
         /// </summary>
-        public static OffsetPattern GeneralInvariantPatternWithZ { get; } = CreateWithInvariantCulture("G");
+        /// <value>The "general" offset pattern for the invariant culture but producing (and allowing) Z as a value for a zero offset.</value>
+        [NotNull] public static OffsetPattern GeneralInvariantWithZ { get; } = CreateWithInvariantCulture("G");
 
         private const string DefaultFormatPattern = "g";
 
@@ -42,12 +44,7 @@ namespace NodaTime.Text
         /// Gets the pattern text for this pattern, as supplied on creation.
         /// </summary>
         /// <value>The pattern text for this pattern, as supplied on creation.</value>
-        public string PatternText { get; }
-
-        /// <summary>
-        /// Returns the localization information used in this pattern.
-        /// </summary>
-        internal NodaFormatInfo FormatInfo { get; }
+        [NotNull] public string PatternText { get; }
 
         /// <summary>
         /// Returns the pattern that this object delegates to. Mostly useful to avoid this public class
@@ -55,10 +52,9 @@ namespace NodaTime.Text
         /// </summary>
         internal IPartialPattern<Offset> UnderlyingPattern { get; }
 
-        private OffsetPattern(string patternText, NodaFormatInfo formatInfo, IPartialPattern<Offset> pattern)
+        private OffsetPattern(string patternText, IPartialPattern<Offset> pattern)
         {
             this.PatternText = patternText;
-            this.FormatInfo = formatInfo;
             this.UnderlyingPattern = pattern;
         }
 
@@ -71,14 +67,14 @@ namespace NodaTime.Text
         /// </remarks>
         /// <param name="text">The text value to parse.</param>
         /// <returns>The result of parsing, which may be successful or unsuccessful.</returns>
-        public ParseResult<Offset> Parse(string text) => UnderlyingPattern.Parse(text);
+        [NotNull] public ParseResult<Offset> Parse([SpecialNullHandling] string text) => UnderlyingPattern.Parse(text);
 
         /// <summary>
         /// Formats the given offset as text according to the rules of this pattern.
         /// </summary>
         /// <param name="value">The offset to format.</param>
         /// <returns>The offset formatted according to this pattern.</returns>
-        public string Format(Offset value) => UnderlyingPattern.Format(value);
+        [NotNull] public string Format(Offset value) => UnderlyingPattern.Format(value);
 
         /// <summary>
         /// Formats the given value as text according to the rules of this pattern,
@@ -87,7 +83,7 @@ namespace NodaTime.Text
         /// <param name="value">The value to format.</param>
         /// <param name="builder">The <c>StringBuilder</c> to append to.</param>
         /// <returns>The builder passed in as <paramref name="builder"/>.</returns>
-        public StringBuilder AppendFormat(Offset value, [NotNull] StringBuilder builder) => UnderlyingPattern.AppendFormat(value, builder);
+        [NotNull] public StringBuilder AppendFormat(Offset value, [NotNull] StringBuilder builder) => UnderlyingPattern.AppendFormat(value, builder);
 
         /// <summary>
         /// Creates a pattern for the given pattern text and format info.
@@ -101,7 +97,7 @@ namespace NodaTime.Text
             Preconditions.CheckNotNull(patternText, nameof(patternText));
             Preconditions.CheckNotNull(formatInfo, nameof(formatInfo));
             var pattern = (IPartialPattern<Offset>) formatInfo.OffsetPatternParser.ParsePattern(patternText);
-            return new OffsetPattern(patternText, formatInfo, pattern);
+            return new OffsetPattern(patternText, pattern);
         }
 
         /// <summary>
@@ -114,7 +110,7 @@ namespace NodaTime.Text
         /// <param name="cultureInfo">The culture to use in the pattern</param>
         /// <returns>A pattern for parsing and formatting offsets.</returns>
         /// <exception cref="InvalidPatternException">The pattern text was invalid.</exception>
-        public static OffsetPattern Create([NotNull] string patternText, [NotNull] CultureInfo cultureInfo) =>
+        [NotNull] public static OffsetPattern Create([NotNull] string patternText, [NotNull] CultureInfo cultureInfo) =>
             Create(patternText, NodaFormatInfo.GetFormatInfo(cultureInfo));
 
         /// <summary>
@@ -128,7 +124,7 @@ namespace NodaTime.Text
         /// <param name="patternText">Pattern text to create the pattern for</param>
         /// <returns>A pattern for parsing and formatting offsets.</returns>
         /// <exception cref="InvalidPatternException">The pattern text was invalid.</exception>
-        public static OffsetPattern CreateWithCurrentCulture([NotNull] string patternText) =>
+        [NotNull] public static OffsetPattern CreateWithCurrentCulture([NotNull] string patternText) =>
             Create(patternText, NodaFormatInfo.CurrentInfo);
 
         /// <summary>
@@ -142,7 +138,7 @@ namespace NodaTime.Text
         /// <param name="patternText">Pattern text to create the pattern for</param>
         /// <returns>A pattern for parsing and formatting offsets.</returns>
         /// <exception cref="InvalidPatternException">The pattern text was invalid.</exception>
-        public static OffsetPattern CreateWithInvariantCulture([NotNull] string patternText) =>
+        [NotNull] public static OffsetPattern CreateWithInvariantCulture([NotNull] string patternText) =>
             Create(patternText, NodaFormatInfo.InvariantInfo);
 
         /// <summary>
@@ -151,7 +147,7 @@ namespace NodaTime.Text
         /// </summary>
         /// <param name="cultureInfo">The culture to use in the new pattern.</param>
         /// <returns>A new pattern with the given culture.</returns>
-        public OffsetPattern WithCulture([NotNull] CultureInfo cultureInfo) =>
+        [NotNull] public OffsetPattern WithCulture([NotNull] CultureInfo cultureInfo) =>
             Create(PatternText, NodaFormatInfo.GetFormatInfo(cultureInfo));
     }
 }

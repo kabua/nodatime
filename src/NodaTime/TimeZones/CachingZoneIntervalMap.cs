@@ -13,26 +13,15 @@ namespace NodaTime.TimeZones
     /// </summary>
     internal static class CachingZoneIntervalMap
     {
-        /// <summary>
-        /// The type of cache to build.
-        /// </summary>
-        internal enum CacheType
-        {
-            Hashtable
-        }
+        // Currently the only implementation is HashArrayCache. This container class is mostly for historical
+        // reasons; it's not really necessary but it does no harm.
 
         /// <summary>
         /// Returns a caching map for the given input map.
         /// </summary>
-        internal static IZoneIntervalMap CacheMap([NotNull] IZoneIntervalMap map, CacheType type)
+        internal static IZoneIntervalMap CacheMap([NotNull] IZoneIntervalMap map)
         {
-            switch (type)
-            {
-                case CacheType.Hashtable:
-                    return new HashArrayCache(map);
-                default:
-                    throw new ArgumentException("The type parameter is invalid", "type");
-            }
+            return new HashArrayCache(map);
         }
 
         #region Nested type: HashArrayCache
@@ -86,7 +75,7 @@ namespace NodaTime.TimeZones
                 int period = instant.DaysSinceEpoch >> PeriodShift;
                 int index = period & CachePeriodMask;
                 var node = instantCache[index];
-                if (node == null || node.Period != period)
+                if (node is null || node.Period != period)
                 {
                     node = HashCacheNode.CreateNode(period, map);
                     instantCache[index] = node;

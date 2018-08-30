@@ -2,7 +2,6 @@
 // Use of this source code is governed by the Apache License 2.0,
 // as found in the LICENSE.txt file.
 
-using System.Globalization;
 using NodaTime.Calendars;
 using NUnit.Framework;
 
@@ -13,7 +12,7 @@ namespace NodaTime.Test.Calendars
         [Test]
         public void DaysInYear()
         {
-            var bcl = new HebrewCalendar();
+            var bcl = BclCalendars.Hebrew;
             var minYear = bcl.GetYear(bcl.MinSupportedDateTime);
             var maxYear = bcl.GetYear(bcl.MaxSupportedDateTime);
 
@@ -26,7 +25,7 @@ namespace NodaTime.Test.Calendars
         [Test]
         public void DaysInMonth()
         {
-            var bcl = new HebrewCalendar();
+            var bcl = BclCalendars.Hebrew;
             // Not all months in the min/max years are supported
             var minYear = bcl.GetYear(bcl.MinSupportedDateTime) + 1;
             var maxYear = bcl.GetYear(bcl.MaxSupportedDateTime) - 1;

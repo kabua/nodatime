@@ -3,6 +3,7 @@
 // as found in the LICENSE.txt file.
 
 using NUnit.Framework;
+using System;
 
 namespace NodaTime.Test
 {
@@ -43,6 +44,13 @@ namespace NodaTime.Test
         }
 
         [Test]
+        public void PlusNanoseconds()
+        {
+            Instant instant = Instant.FromUnixTimeTicks(5);
+            Assert.AreEqual(Instant.FromUnixTimeTicks(8), instant.PlusNanoseconds(300));
+        }
+
+        [Test]
         public void OperatorPlusDuration_Zero_IsNeutralElement()
         {
             Assert.AreEqual(NodaConstants.UnixEpoch, NodaConstants.UnixEpoch + Duration.Zero, "UnixEpoch + Duration.Zero");
@@ -74,6 +82,12 @@ namespace NodaTime.Test
             Assert.AreEqual(new LocalInstant(0, 1L), one.Plus(Offset.Zero), "Instant(1) + Offset.Zero");
             Assert.AreEqual(new LocalInstant(0, NodaConstants.NanosecondsPerHour), NodaConstants.UnixEpoch.Plus(Offset.FromHours(1)), "UnixEpoch + offsetOneHour");
         }
+
+        [Test]
+        public void OperatorPlus_OutOfRange()
+        {
+            Assert.Throws<OverflowException>(() => (Instant.MaxValue + Duration.Epsilon).GetHashCode());
+        }
         #endregion
 
         #region operator - (duration)
@@ -92,6 +106,12 @@ namespace NodaTime.Test
         {
             Assert.AreEqual(threeMillion - Duration.Epsilon, threeMillion.Minus(Duration.Epsilon));
             Assert.AreEqual(threeMillion - Duration.Epsilon, Instant.Subtract(threeMillion, Duration.Epsilon));
+        }
+
+        [Test]
+        public void OperatorMinus_OutOfRange()
+        {
+            Assert.Throws<OverflowException>(() => (Instant.MinValue - Duration.Epsilon).GetHashCode());
         }
         #endregion
 

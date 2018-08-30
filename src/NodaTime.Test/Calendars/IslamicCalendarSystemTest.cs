@@ -28,7 +28,7 @@ namespace NodaTime.Test.Calendars
             Assert.AreEqual(1364, ldt.Year);
             Assert.AreEqual(12, ldt.Month);
             Assert.AreEqual(6, ldt.Day);
-            Assert.AreEqual(IsoDayOfWeek.Monday, ldt.IsoDayOfWeek);
+            Assert.AreEqual(IsoDayOfWeek.Monday, ldt.DayOfWeek);
             Assert.AreEqual(6 * 30 + 5 * 29 + 6, ldt.DayOfYear);
 
             Assert.AreEqual(0, ldt.Hour);
@@ -48,7 +48,7 @@ namespace NodaTime.Test.Calendars
             Assert.AreEqual(1426, ldt.Year);
             Assert.AreEqual(10, ldt.Month);
             Assert.AreEqual(24, ldt.Day);
-            Assert.AreEqual(IsoDayOfWeek.Saturday, ldt.IsoDayOfWeek);
+            Assert.AreEqual(IsoDayOfWeek.Saturday, ldt.DayOfWeek);
             Assert.AreEqual(5 * 30 + 4 * 29 + 24, ldt.DayOfYear);
             Assert.AreEqual(0, ldt.Hour);
             Assert.AreEqual(0, ldt.Minute);
@@ -65,7 +65,7 @@ namespace NodaTime.Test.Calendars
             Assert.AreEqual(1426, ldt.Year);
             Assert.AreEqual(12, ldt.Month);
             Assert.AreEqual(24, ldt.Day);
-            Assert.AreEqual(IsoDayOfWeek.Tuesday, ldt.IsoDayOfWeek);
+            Assert.AreEqual(IsoDayOfWeek.Tuesday, ldt.DayOfWeek);
             Assert.AreEqual(6 * 30 + 5 * 29 + 24, ldt.DayOfYear);
             Assert.AreEqual(0, ldt.Hour);
             Assert.AreEqual(0, ldt.Minute);
@@ -267,8 +267,8 @@ namespace NodaTime.Test.Calendars
         [Test]
         public void BclUsesAstronomicalEpoch()
         {
-            Calendar hijri = new HijriCalendar();
-            DateTime bclDirect = new DateTime(1, 1, 1, 0, 0, 0, 0, hijri, DateTimeKind.Unspecified);
+            Calendar hijri = BclCalendars.Hijri;
+            DateTime bclDirect = hijri.ToDateTime(1, 1, 1, 0, 0, 0, 0);
 
             CalendarSystem julianCalendar = CalendarSystem.Julian;
             LocalDate julianIslamicEpoch = new LocalDate(622, 7, 15, julianCalendar);
@@ -280,8 +280,8 @@ namespace NodaTime.Test.Calendars
         [Test]
         public void SampleDateBclCompatibility()
         {
-            Calendar hijri = new HijriCalendar();
-            DateTime bclDirect = new DateTime(1302, 10, 15, 0, 0, 0, 0, hijri, DateTimeKind.Unspecified);
+            Calendar hijri = BclCalendars.Hijri;
+            DateTime bclDirect = hijri.ToDateTime(1302, 10, 15, 0, 0, 0, 0);
 
             CalendarSystem islamicCalendar = CalendarSystem.IslamicBcl;
             LocalDate iso = new LocalDate(1302, 10, 15, islamicCalendar);
@@ -292,13 +292,13 @@ namespace NodaTime.Test.Calendars
         /// <summary>
         /// This tests every day for 9000 (ISO) years, to check that it always matches the year, month and day.
         /// </summary>
-        [Test, Timeout(180000)] // Can take a long time under NCrunch.
+        [Test]
         [Category("Slow")]
         public void BclThroughHistory()
         {
-            var bcl = new HijriCalendar();
+            var bcl = BclCalendars.Hijri;
             var noda = CalendarSystem.IslamicBcl;
-            BclEquivalenceHelper.AssertEquivalent(bcl, noda, noda.MinYear, noda.MaxYear);
+            BclEquivalenceHelper.AssertEquivalent(bcl, noda);
         }
 
         [Test]
@@ -410,6 +410,13 @@ namespace NodaTime.Test.Calendars
             Assert.AreEqual(11, expectedEnd.Month);
             Assert.AreEqual(30, expectedEnd.Day);
             Assert.AreEqual(expectedEnd, start.PlusMonths(11));
+        }
+
+        [Test]
+        public void Constructor_InvalidEnumsForCoverage()
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => new IslamicYearMonthDayCalculator(IslamicLeapYearPattern.Base15 + 100, IslamicEpoch.Astronomical));
+            Assert.Throws<ArgumentOutOfRangeException>(() => new IslamicYearMonthDayCalculator(IslamicLeapYearPattern.Base15, IslamicEpoch.Astronomical + 100));
         }
     }
 }

@@ -57,7 +57,7 @@ namespace NodaTime.Calendars
         /// so calendars which override that method and don't call the original implementation may leave
         /// this unimplemented (e.g. by throwing an exception if it's ever called).
         /// </summary>
-        // TODO(jonskeet): Either hard-code a check that this *is* only called by GetStartOfYearInDays
+        // TODO(misc): Either hard-code a check that this *is* only called by GetStartOfYearInDays
         // via a Roslyn test, or work out an attribute to indicate that, and write a more general test.
         protected abstract int CalculateStartOfYearDays([Trusted] int year);
         internal abstract int GetMonthsInYear([Trusted] int year);
@@ -74,9 +74,10 @@ namespace NodaTime.Calendars
         internal abstract int GetDaysInYear([Trusted] int year);
 
         /// <summary>
-        /// Subtract subtrahendDate from minuendDate, in terms of months.
+        /// Find the months between <paramref name="start"/> and <paramref name="end"/>.
+        /// (If start is earlier than end, the result will be non-negative.)
         /// </summary>
-        internal abstract int MonthsBetween([Trusted] YearMonthDay minuendDate, [Trusted] YearMonthDay subtrahendDate);
+        internal abstract int MonthsBetween([Trusted] YearMonthDay start, [Trusted] YearMonthDay end);
 
         /// <summary>
         /// Adjusts the given YearMonthDay to the specified year, potentially adjusting
@@ -108,9 +109,6 @@ namespace NodaTime.Calendars
         internal virtual int GetStartOfYearInDays([Trusted] int year)
         {
             Preconditions.DebugCheckArgumentRange(nameof(year), year, MinYear - 1, MaxYear + 1);
-            // TODO(2.0): Check that it's valid to cache values outside the advertised
-            // bounds of the calendar (by one year). We used not to cache them, but just
-            // the check was relatively expensive.
             int cacheIndex = YearStartCacheEntry.GetCacheIndex(year);
             YearStartCacheEntry cacheEntry = yearCache[cacheIndex];
             if (!cacheEntry.IsValidForYear(year))
@@ -156,8 +154,7 @@ namespace NodaTime.Calendars
         /// </summary>
         internal YearMonthDay GetYearMonthDay([Trusted] int daysSinceEpoch)
         {
-            int zeroBasedDay;
-            int year = GetYear(daysSinceEpoch, out zeroBasedDay);
+            int year = GetYear(daysSinceEpoch, out int zeroBasedDay);
             return GetYearMonthDay(year, zeroBasedDay + 1);
         }
 

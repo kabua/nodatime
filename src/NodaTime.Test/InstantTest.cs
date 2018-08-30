@@ -239,6 +239,31 @@ namespace NodaTime.Test
             Assert.AreEqual(DateTimeKind.Utc, actual.Kind);
         }
 
+        // See issue 269, but now we throw a nicer exception.
+        [Test]
+        public void ToBclTypes_DateOutOfRange()
+        {
+            var instant = Instant.FromUtc(1, 1, 1, 0, 0).PlusNanoseconds(-1);
+            Assert.Throws<InvalidOperationException>(() => instant.ToDateTimeUtc());
+            Assert.Throws<InvalidOperationException>(() => instant.ToDateTimeOffset());
+        }
+
+        [Test]
+        [TestCase(100)]
+        [TestCase(1900)]
+        [TestCase(2900)]
+        public void ToBclTypes_TruncateNanosTowardStartOfTime(int year)
+        {
+            var instant = Instant.FromUtc(year, 1, 1, 13, 15, 55).PlusNanoseconds(NodaConstants.NanosecondsPerSecond - 1);
+            var expectedDateTimeUtc = new DateTime(year, 1, 1, 13, 15, 55, DateTimeKind.Unspecified)
+                .AddTicks(NodaConstants.TicksPerSecond - 1);
+            var actualDateTimeUtc = instant.ToDateTimeUtc();
+            Assert.AreEqual(expectedDateTimeUtc, actualDateTimeUtc);
+            var expectedDateTimeOffset = new DateTimeOffset(expectedDateTimeUtc, TimeSpan.Zero);
+            var actualDateTimeOffset = instant.ToDateTimeOffset();
+            Assert.AreEqual(expectedDateTimeOffset, actualDateTimeOffset);
+        }
+
         [Test]
         public void ToDateTimeOffset()
         {
@@ -283,8 +308,8 @@ namespace NodaTime.Test
         [Test]
         public void XmlSerialization()
         {
-            var value = new LocalDateTime(2013, 4, 12, 17, 53, 23, 123, 4567).InUtc().ToInstant();
-            TestHelper.AssertXmlRoundtrip(value, "<value>2013-04-12T17:53:23.1234567Z</value>");
+            var value = new LocalDateTime(2013, 4, 12, 17, 53, 23).PlusNanoseconds(123456789).InUtc().ToInstant();
+            TestHelper.AssertXmlRoundtrip(value, "<value>2013-04-12T17:53:23.123456789Z</value>");
         }
 
         [Test]
@@ -293,15 +318,7 @@ namespace NodaTime.Test
         {
             TestHelper.AssertXmlInvalid<Instant>(xml, expectedExceptionType);
         }
-
-        [Test]
-        public void BinarySerialization()
-        {
-            TestHelper.AssertBinaryRoundtrip(Instant.FromUnixTimeTicks(12345L));
-            TestHelper.AssertBinaryRoundtrip(Instant.MinValue);
-            TestHelper.AssertBinaryRoundtrip(Instant.MaxValue);
-        }
-
+        
         [Test]
         [TestCase(-101L, -2L)]
         [TestCase(-100L, -1L)]
@@ -393,17 +410,57 @@ namespace NodaTime.Test
             TestHelper.AssertOutOfRange(Instant.FromUnixTimeTicks, largestValid + 1);
         }
 
-        // See issue 269.
         [Test]
-        public void ToDateTimeUtc_WithOverflow()
+        public void PlusOffset()
         {
-            TestHelper.AssertOverflow(() => Instant.MinValue.ToDateTimeUtc());
+            var localInstant = NodaConstants.UnixEpoch.Plus(Offset.FromHours(1));
+            Assert.AreEqual(Duration.FromHours(1), localInstant.TimeSinceLocalEpoch);
         }
 
         [Test]
-        public void ToDateTimeOffset_WithOverflow()
+        public void SafePlus_NormalTime()
         {
-            TestHelper.AssertOverflow(() => Instant.MinValue.ToDateTimeOffset());
+            var localInstant = NodaConstants.UnixEpoch.SafePlus(Offset.FromHours(1));
+            Assert.AreEqual(Duration.FromHours(1), localInstant.TimeSinceLocalEpoch);
+        }
+
+        [Test]
+        [TestCase(null, 0, null)]
+        [TestCase(null, 1, null)]
+        [TestCase(null, -1, null)]
+        [TestCase(1, -1, 0)]
+        [TestCase(1, -2, null)]
+        [TestCase(2, 1, 3)]
+        public void SafePlus_NearStartOfTime(int? initialOffset, int offsetToAdd, int? finalOffset)
+        {
+            var start = initialOffset is null
+                ? Instant.BeforeMinValue
+                : Instant.MinValue + Duration.FromHours(initialOffset.Value);
+            var expected = finalOffset is null
+                ? LocalInstant.BeforeMinValue
+                : Instant.MinValue.Plus(Offset.FromHours(finalOffset.Value));
+            var actual = start.SafePlus(Offset.FromHours(offsetToAdd));
+            Assert.AreEqual(expected, actual);
+        }
+
+        // A null offset indicates "AfterMaxValue". Otherwise, MaxValue.Plus(offset)
+        [Test]
+        [TestCase(null, 0, null)]
+        [TestCase(null, 1, null)]
+        [TestCase(null, -1, null)]
+        [TestCase(-1, 1, 0)]
+        [TestCase(-1, 2, null)]
+        [TestCase(-2, -1, -3)]
+        public void SafePlus_NearEndOfTime(int? initialOffset, int offsetToAdd, int? finalOffset)
+        {
+            var start = initialOffset is null
+                ? Instant.AfterMaxValue
+                : Instant.MaxValue + Duration.FromHours(initialOffset.Value);
+            var expected = finalOffset is null
+                ? LocalInstant.AfterMaxValue
+                : Instant.MaxValue.Plus(Offset.FromHours(finalOffset.Value));
+            var actual = start.SafePlus(Offset.FromHours(offsetToAdd));
+            Assert.AreEqual(expected, actual);
         }
     }
 }

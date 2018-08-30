@@ -30,13 +30,16 @@ namespace NodaTime.Test.Utility
             var original = new Dictionary<int, int> { { 10, 20 } };
             IDictionary<int, int> readOnly = new NodaReadOnlyDictionary<int, int>(original);
             Assert.AreEqual(20, readOnly[10]);
-            int value;
-            Assert.IsTrue(readOnly.TryGetValue(10, out value));
+            Assert.IsTrue(readOnly.TryGetValue(10, out int value));
             Assert.AreEqual(20, value);
             Assert.AreEqual(1, readOnly.Count);
+            Assert.IsTrue(readOnly.Contains(new KeyValuePair<int, int>(10, 20)));
             CollectionAssert.AreEqual(original, readOnly);
             CollectionAssert.AreEqual(original.Keys, readOnly.Keys);
             CollectionAssert.AreEqual(original.Values, readOnly.Values);
+            var array = new KeyValuePair<int, int>[1];
+            readOnly.CopyTo(array, 0);
+            Assert.AreEqual(new KeyValuePair<int, int>(10, 20), array[0]);
         }
 
         [Test]

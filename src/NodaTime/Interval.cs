@@ -2,15 +2,14 @@
 // Use of this source code is governed by the Apache License 2.0,
 // as found in the LICENSE.txt file.
 
-using System;
-using System.Runtime.Serialization;
-using System.Xml;
-using System.Xml.Schema;
-using System.Xml.Serialization;
 using JetBrains.Annotations;
 using NodaTime.Text;
 using NodaTime.Utility;
-using NodaTime.Annotations;
+using System;
+using System.Runtime.CompilerServices;
+using System.Xml;
+using System.Xml.Schema;
+using System.Xml.Serialization;
 
 namespace NodaTime
 {
@@ -28,13 +27,7 @@ namespace NodaTime
     /// </para>
     /// </remarks>
     /// <threadsafety>This type is an immutable value type. See the thread safety section of the user guide for more information.</threadsafety>
-#if !PCL
-    [Serializable]
-#endif
-    public struct Interval : IEquatable<Interval>, IXmlSerializable
-#if !PCL
-        , ISerializable
-#endif
+    public readonly struct Interval : IEquatable<Interval>, IXmlSerializable
     {
         /// <summary>The start of the interval.</summary>
         private readonly Instant start;
@@ -155,6 +148,18 @@ namespace NodaTime
         [Pure]
         public bool Contains(Instant instant) => instant >= start && instant < end;
 
+        /// <summary>
+        /// Deconstruct this value into its components.
+        /// </summary>
+        /// <param name="start">The start of the interval.</param>
+        /// <param name="end">The end of the interval.</param>
+        [Pure]
+        public void Deconstruct(out Instant? start, out Instant? end)
+        {
+            start = this.start.IsValid ? Start : (Instant?)null;
+            end = this.end.IsValid ? End : (Instant?)null;
+          }
+
         #region Implementation of IEquatable<Interval>
         /// <summary>
         /// Indicates whether the value of this interval is equal to the value of the specified interval.
@@ -197,7 +202,7 @@ namespace NodaTime
         /// <returns>A string representation of this interval.</returns>
         public override string ToString()
         {
-            var pattern = InstantPattern.ExtendedIsoPattern;
+            var pattern = InstantPattern.ExtendedIso;
             return pattern.Format(start) + "/" + pattern.Format(end);
         }
         #endregion
@@ -228,10 +233,10 @@ namespace NodaTime
         void IXmlSerializable.ReadXml([NotNull] XmlReader reader)
         {
             Preconditions.CheckNotNull(reader, nameof(reader));
-            var pattern = InstantPattern.ExtendedIsoPattern;
+            var pattern = InstantPattern.ExtendedIso;
             Instant newStart = reader.MoveToAttribute("start") ? pattern.Parse(reader.Value).Value : Instant.BeforeMinValue;
             Instant newEnd = reader.MoveToAttribute("end") ? pattern.Parse(reader.Value).Value : Instant.AfterMaxValue;
-            this = new Interval(newStart, newEnd);
+            Unsafe.AsRef(this) = new Interval(newStart, newEnd);
             // Consume the rest of this element, as per IXmlSerializable.ReadXml contract.
             reader.Skip();
         }
@@ -240,7 +245,7 @@ namespace NodaTime
         void IXmlSerializable.WriteXml([NotNull] XmlWriter writer)
         {
             Preconditions.CheckNotNull(writer, nameof(writer));
-            var pattern = InstantPattern.ExtendedIsoPattern;
+            var pattern = InstantPattern.ExtendedIso;
             if (HasStart)
             {
                 writer.WriteAttributeString("start", pattern.Format(start));
@@ -251,54 +256,5 @@ namespace NodaTime
             }
         }
         #endregion
-
-#if !PCL
-        #region Binary serialization
-        private const string StartDaysSerializationName = "startDays";
-        private const string EndDaysSerializationName = "endDays";
-        private const string StartNanosecondOfDaySerializationName = "startNanoOfDay";
-        private const string EndNanosecondOfDaySerializationName = "endNanoOfDay";
-        private const string PresenceName = "presence";
-
-        /// <summary>
-        /// Private constructor only present for serialization.
-        /// </summary>
-        /// <param name="info">The <see cref="SerializationInfo"/> to fetch data from.</param>
-        /// <param name="context">The source for this deserialization.</param>
-        private Interval([NotNull] SerializationInfo info, StreamingContext context)
-        {
-            var presence = info.GetByte(PresenceName);
-            start = (presence & 1) == 0 ?
-                Instant.BeforeMinValue
-                : Instant.FromUntrustedDuration(new Duration(info, StartDaysSerializationName, StartNanosecondOfDaySerializationName));
-            end = (presence & 2) == 0 ?
-                Instant.AfterMaxValue
-                : Instant.FromUntrustedDuration(new Duration(info, EndDaysSerializationName, EndNanosecondOfDaySerializationName));
-        }
-
-        /// <summary>
-        /// Implementation of <see cref="ISerializable.GetObjectData"/>.
-        /// </summary>
-        /// <param name="info">The <see cref="SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination for this serialization.</param>
-        [System.Security.SecurityCritical]
-        void ISerializable.GetObjectData([NotNull] SerializationInfo info, StreamingContext context)
-        {
-            // We can't easily tell which fields are present based on SerializationInfo (other than by iterating),
-            // so we add one extra value to say which other values to include. We may wish to generalize this
-            // at some point...
-            info.AddValue(PresenceName, (byte) ((HasStart ? 1 : 0) | (HasEnd ? 2 : 0)));
-            // FIXME:SERIALIZATION
-            if (HasStart)
-            {
-                start.TimeSinceEpoch.Serialize(info, StartDaysSerializationName, StartNanosecondOfDaySerializationName);
-            }
-            if (HasEnd)
-            {
-                end.TimeSinceEpoch.Serialize(info, EndDaysSerializationName, EndNanosecondOfDaySerializationName);
-            }
-        }
-        #endregion
-#endif
     }
 }

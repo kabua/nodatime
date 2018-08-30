@@ -12,10 +12,11 @@ namespace NodaTime
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The day is represented in bits 0-5. The month is represented in bits 6-9. The
-    /// year is represented in bits 10-24. This type is naive: comparisons are performed
-    /// assuming that a larger month number always comes after a smaller month number,
-    /// etc. This is suitable for most, but not all, calendar systems.
+    /// See <see cref="YearMonthDayCalendar"/> for the number of bits per component,
+    /// but this doesn't have the calendar component, so bit 0 is part of the day value.
+    /// This type is naive: comparisons are performed assuming that a larger month number
+    /// always comes after a smaller month number, etc.
+    /// This is suitable for most, but not all, calendar systems.
     /// </para>
     /// <para>
     /// The internal representation actually uses 0 for 1 (etc) for each component.
@@ -23,14 +24,10 @@ namespace NodaTime
     /// supported calendars.
     /// </para>
     /// </remarks>
-    internal struct YearMonthDay : IComparable<YearMonthDay>, IEquatable<YearMonthDay>
+    internal readonly struct YearMonthDay : IComparable<YearMonthDay>, IEquatable<YearMonthDay>
     {
-        private const int DayBits = 6;   // Up to 64 days in a month.
-        private const int MonthBits = 4; // Up to 16 months per year.
-        private const int YearBits = 15; // 32K range; only need -10K to +10K.
-
-        private const int DayMask = (1 << DayBits) - 1;
-        private const int MonthMask = ((1 << MonthBits) - 1) << DayBits;
+        private const int DayMask = (1 << YearMonthDayCalendar.DayBits) - 1;
+        private const int MonthMask = ((1 << YearMonthDayCalendar.MonthBits) - 1) << YearMonthDayCalendar.DayBits;
 
         private readonly int value;
 
@@ -46,15 +43,15 @@ namespace NodaTime
         {
             unchecked
             {
-                value = ((year - 1) << (DayBits + MonthBits)) | ((month - 1) << DayBits) | (day - 1);
+                value = ((year - 1) << (YearMonthDayCalendar.DayBits + YearMonthDayCalendar.MonthBits)) |
+                        ((month - 1) << YearMonthDayCalendar.DayBits) |
+                        (day - 1);
             }
         }
 
-        internal int Year => unchecked((value >> (DayBits + MonthBits)) + 1);
-        internal int Month => unchecked(((value & MonthMask) >> DayBits) + 1);
+        internal int Year => unchecked((value >> (YearMonthDayCalendar.DayBits + YearMonthDayCalendar.MonthBits)) + 1);
+        internal int Month => unchecked(((value & MonthMask) >> YearMonthDayCalendar.DayBits) + 1);
         internal int Day => unchecked((value & DayMask) + 1);
-
-        public int RawValue => value;
 
         // Just for testing purposes...
         internal static YearMonthDay Parse(string text)
@@ -77,7 +74,7 @@ namespace NodaTime
             string.Format(CultureInfo.InvariantCulture, "{0:0000}-{1:00}-{2:00}", Year, Month, Day);
 
         internal YearMonthDayCalendar WithCalendar([CanBeNull] CalendarSystem calendar) =>
-            new YearMonthDayCalendar(value, calendar == null ? 0 : calendar.Ordinal);
+            new YearMonthDayCalendar(value, calendar?.Ordinal ?? 0);
 
         internal YearMonthDayCalendar WithCalendarOrdinal(CalendarOrdinal calendarOrdinal) =>
             new YearMonthDayCalendar(value, calendarOrdinal);

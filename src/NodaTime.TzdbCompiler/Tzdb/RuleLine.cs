@@ -2,12 +2,11 @@
 // Use of this source code is governed by the Apache License 2.0,
 // as found in the LICENSE.txt file.
 
-using System;
-using System.Text;
 using NodaTime.TimeZones;
 using NodaTime.Utility;
+using System;
 using System.Collections.Generic;
-using NodaTime.Text;
+using System.Text;
 
 namespace NodaTime.TzdbCompiler.Tzdb
 {
@@ -19,8 +18,6 @@ namespace NodaTime.TzdbCompiler.Tzdb
     /// </remarks>
     internal class RuleLine : IEquatable<RuleLine>
     {
-        private static readonly OffsetPattern PercentZPattern = OffsetPattern.CreateWithInvariantCulture("i");
-
         /// <summary>
         /// The string to replace "%s" with (if any) when formatting the zone name key.
         /// </summary>
@@ -66,7 +63,7 @@ namespace NodaTime.TzdbCompiler.Tzdb
         ///   true if the current object is equal to the <paramref name = "other" /> parameter;
         ///   otherwise, false.
         /// </returns>
-        public bool Equals(RuleLine other) => other != null && Equals(recurrence, other.recurrence) && Equals(daylightSavingsIndicator, other.daylightSavingsIndicator);
+        public bool Equals(RuleLine other) => !(other is null) && Equals(recurrence, other.recurrence) && Equals(daylightSavingsIndicator, other.daylightSavingsIndicator);
         #endregion
 
         #region Operator overloads
@@ -77,7 +74,7 @@ namespace NodaTime.TzdbCompiler.Tzdb
         /// <param name="right">The right.</param>
         /// <returns>The result of the operator.</returns>
         public static bool operator ==(RuleLine left, RuleLine right) =>        
-            ReferenceEquals(left, null) ? ReferenceEquals(right, null) : left.Equals(right);
+            left is null ? right is null : left.Equals(right);
 
         /// <summary>
         ///   Implements the operator !=.
@@ -98,8 +95,8 @@ namespace NodaTime.TzdbCompiler.Tzdb
         /// <param name="zone">The zone for which this rule is being considered.</param>
         public IEnumerable<ZoneRecurrence> GetRecurrences(ZoneLine zone)
         {
-            string name = FormatName(zone);
-            if (Type == null)
+            string name = zone.FormatName(recurrence.Savings, daylightSavingsIndicator);
+            if (Type is null)
             {
                 yield return recurrence.WithName(name);
             }
@@ -132,32 +129,6 @@ namespace NodaTime.TzdbCompiler.Tzdb
                 default:
                     throw new NotSupportedException($"Noda Time does not support rules of type {Type}");
             }
-        }
-
-        private string FormatName(ZoneLine zone)
-        {
-            string nameFormat = zone.Format;
-            int index = nameFormat.IndexOf("/", StringComparison.Ordinal);
-            if (index > 0)
-            {
-                return recurrence.Savings == Offset.Zero ? nameFormat.Substring(0, index) : nameFormat.Substring(index + 1);
-            }
-            index = nameFormat.IndexOf("%s", StringComparison.Ordinal);
-            if (index >= 0)
-            {
-                var left = nameFormat.Substring(0, index);
-                var right = nameFormat.Substring(index + 2);
-                return left + daylightSavingsIndicator + right;
-            }
-            index = nameFormat.IndexOf("%z", StringComparison.Ordinal);
-            if (index >= 0)
-            {
-                var wallOffset = zone.StandardOffset + recurrence.Savings;
-                var left = nameFormat.Substring(0, index);
-                var right = nameFormat.Substring(index + 2);
-                return left + PercentZPattern.Format(wallOffset) + right;
-            }
-            return nameFormat;
         }
 
         #region Object overrides

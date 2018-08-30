@@ -14,10 +14,6 @@ namespace NodaTime.Testing.TimeZones
     /// A time zone source for test purposes.
     /// Create instances via <see cref="FakeDateTimeZoneSource.Builder"/>.
     /// </summary>
-    /// <remarks>Under the PCL, the mapping from TimeZoneInfo is performed
-    /// using the StandardName property instead of the Id property, as the Id
-    /// property isn't available. The standard name is almost always the same
-    /// anyway, known exceptions including Jerusalem and the Malay Peninsula.</remarks>
     public sealed class FakeDateTimeZoneSource : IDateTimeZoneSource
     {
         private readonly Dictionary<string, DateTimeZone> zones;
@@ -48,8 +44,7 @@ namespace NodaTime.Testing.TimeZones
         public DateTimeZone ForId(string id)
         {
             Preconditions.CheckNotNull(id, nameof(id));
-            DateTimeZone zone;
-            if (zones.TryGetValue(id, out zone))
+            if (zones.TryGetValue(id, out DateTimeZone zone))
             {
                 return zone;
             }
@@ -59,25 +54,18 @@ namespace NodaTime.Testing.TimeZones
         // TODO: Work out why inheritdoc doesn't work here. What's special about this method?
 
         /// <summary>
-        /// Returns this source's corresponding ID for the given BCL time zone.
+        /// Returns this source's ID for the system default time zone.
         /// </summary>
-        /// <param name="timeZone">The BCL time zone, which must be a known system time zone.</param>
         /// <returns>
-        /// The ID for the given system time zone for this source, or null if the system time
-        /// zone has no mapping in this source.
+        /// The ID for the system default time zone for this source,
+        /// or null if the system default time zone has no mapping in this source.
         /// </returns>
-        public string MapTimeZoneId(TimeZoneInfo timeZone)
+        public string GetSystemDefaultId()
         {
-            Preconditions.CheckNotNull(timeZone, nameof(timeZone));
-#if PCL
-            string id = timeZone.StandardName;
-#else
-            string id = timeZone.Id;
-#endif
-            string canonicalId;
+            string id = TimeZoneInfo.Local.Id;
             // We don't care about the return value of TryGetValue - if it's false,
             // canonicalId will be null, which is what we want.
-            bclToZoneIds.TryGetValue(id, out canonicalId);
+            bclToZoneIds.TryGetValue(id, out string canonicalId);
             return canonicalId;
         }
 
@@ -159,6 +147,10 @@ namespace NodaTime.Testing.TimeZones
                 foreach (var entry in bclIdsToZoneIds)
                 {
                     Preconditions.CheckNotNull(entry.Value, "value");
+                    if (!zoneMap.ContainsKey(entry.Value))
+                    {
+                        throw new InvalidOperationException($"Mapping for BCL {entry.Key}/{entry.Value} has no corresponding zone.");
+                    }
                 }
                 var bclIdMapClone = new Dictionary<string, string>(bclIdsToZoneIds);
                 return new FakeDateTimeZoneSource(VersionId, zoneMap, bclIdMapClone);

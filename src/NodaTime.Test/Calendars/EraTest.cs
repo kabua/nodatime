@@ -3,7 +3,7 @@
 // as found in the LICENSE.txt file.
 
 using NodaTime.Calendars;
-using NodaTime.Properties;
+using NodaTime.Globalization;
 using NUnit.Framework;
 using System.Collections.Generic;
 using System.Globalization;
@@ -14,7 +14,8 @@ namespace NodaTime.Test.Calendars
 {
     public class EraTest
     {
-        private static readonly IEnumerable<Era> Eras = typeof(Era).GetProperties(BindingFlags.Public | BindingFlags.Static)
+        private static readonly IEnumerable<Era> Eras = typeof(Era).GetTypeInfo()
+                                                                   .DeclaredProperties // TODO: Only static and public ones...
                                                                    .Where(property => property.PropertyType == typeof(Era))
                                                                    .Select(property => property.GetValue(null, null))
                                                                    .Cast<Era>();
@@ -23,8 +24,8 @@ namespace NodaTime.Test.Calendars
         [Test]
         public void ResourcePresence(Era era)
         {
-            Assert.NotNull(PatternResources.ResourceManager.GetString(era.ResourceIdentifier, CultureInfo.InvariantCulture),
-                "Missing resource for " + era.ResourceIdentifier);
+            var valueByName = PatternResources.ResourceManager.GetString(era.ResourceIdentifier, CultureInfo.InvariantCulture);
+            Assert.NotNull(valueByName, "Missing resource for " + era.ResourceIdentifier);
         }
     }
 }

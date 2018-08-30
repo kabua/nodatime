@@ -6,6 +6,9 @@ using System;
 using NodaTime.Testing.TimeZones;
 using NodaTime.TimeZones;
 using NUnit.Framework;
+using System.IO;
+using NodaTime.TimeZones.IO;
+using System.Linq;
 
 namespace NodaTime.Test.TimeZones
 {
@@ -280,16 +283,19 @@ namespace NodaTime.Test.TimeZones
         }
 
         [Test]
-        public void Equals()
+        public void Serialization()
         {
-            TestHelper.TestEqualsClass<DateTimeZone>
-                (new PrecalculatedDateTimeZone("Test", new[] { FirstInterval, SecondInterval, ThirdInterval }, TailZone),
-                 new PrecalculatedDateTimeZone("Test", new[] { FirstInterval, SecondInterval, ThirdInterval }, TailZone),
-                 new PrecalculatedDateTimeZone("Test other ID", new[] { FirstInterval, SecondInterval, ThirdInterval }, TailZone));
-            TestHelper.TestEqualsClass<DateTimeZone>
-                (new PrecalculatedDateTimeZone("Test", new[] { FirstInterval, SecondInterval, ThirdInterval }, TailZone),
-                 new PrecalculatedDateTimeZone("Test", new[] { FirstInterval, SecondInterval, ThirdInterval }, TailZone),
-                 new PrecalculatedDateTimeZone("Test", new[] { SecondInterval.WithStart(Instant.BeforeMinValue), ThirdInterval }, TailZone));
+            var stream = new MemoryStream();
+            var writer = new DateTimeZoneWriter(stream, null);
+            TestZone.Write(writer);
+            stream.Position = 0;
+            var reloaded = PrecalculatedDateTimeZone.Read(new DateTimeZoneReader(stream, null), TestZone.Id);
+
+            // Check equivalence by finding zone intervals
+            var interval = new Interval(Instant.FromUtc(1990, 1, 1, 0, 0), Instant.FromUtc(2010, 1, 1, 0, 0));
+            var originalZoneIntervals = TestZone.GetZoneIntervals(interval, ZoneEqualityComparer.Options.StrictestMatch).ToList();
+            var reloadedZoneIntervals = TestZone.GetZoneIntervals(interval, ZoneEqualityComparer.Options.StrictestMatch).ToList();
+            CollectionAssert.AreEqual(originalZoneIntervals, reloadedZoneIntervals);
         }
     }
 }

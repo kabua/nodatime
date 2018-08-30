@@ -17,20 +17,21 @@ namespace NodaTime.TzdbCompiler.Tzdb
     /// </summary>
     internal class CldrWindowsZonesParser
     {
-        internal static WindowsZones Parse(string file)
+        internal static WindowsZones Parse(XDocument document)
         {
-            var document = LoadFile(file);
             var mapZones = MapZones(document);
             var windowsZonesVersion = FindVersion(document);
-            var tzdbVersion = document.Root.Element("windowsZones").Element("mapTimezones").Attribute("typeVersion").Value;
-            var windowsVersion = document.Root.Element("windowsZones").Element("mapTimezones").Attribute("otherVersion").Value;
+            var tzdbVersion = document.Root.Element("windowsZones")?.Element("mapTimezones")?.Attribute("typeVersion")?.Value ?? "";
+            var windowsVersion = document.Root.Element("windowsZones")?.Element("mapTimezones")?.Attribute("otherVersion")?.Value ?? "";
             return new WindowsZones(windowsZonesVersion, tzdbVersion, windowsVersion, mapZones);
         }
+
+        internal static WindowsZones Parse(string file) => Parse(LoadFile(file));
 
         private static XDocument LoadFile(string file)
         {
             // These settings allow the XML parser to ignore the DOCTYPE element
-            var readerSettings = new XmlReaderSettings() { XmlResolver = null, DtdProcessing = DtdProcessing.Ignore };
+            var readerSettings = new XmlReaderSettings() { DtdProcessing = DtdProcessing.Ignore };
             using (var reader = File.OpenRead(file))            
             using (var xmlReader = XmlReader.Create(reader, readerSettings))
             {
@@ -40,7 +41,11 @@ namespace NodaTime.TzdbCompiler.Tzdb
 
         private static string FindVersion(XDocument document)
         {
-            string revision = (string)document.Root.Element("version").Attribute("number");
+            string revision = (string)document.Root.Element("version")?.Attribute("number");
+            if (revision is null)
+            {
+                return "";
+            }
             string prefix = "$Revision: ";
             if (revision.StartsWith(prefix))
             {
@@ -65,7 +70,7 @@ namespace NodaTime.TzdbCompiler.Tzdb
                 .Elements("mapZone")
                 .Select(x => new MapZone(x.Attribute("other").Value,
                                          x.Attribute("territory").Value,
-                                         x.Attribute("type").Value.Split(' ').ToList()))
+                                         x.Attribute("type").Value.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)))
                 .ToList();
     }
 }

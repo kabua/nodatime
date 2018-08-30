@@ -2,8 +2,6 @@
 // Use of this source code is governed by the Apache License 2.0,
 // as found in the LICENSE.txt file.
 
-using System;
-using System.Linq;
 using NodaTime.Calendars;
 using NUnit.Framework;
 
@@ -31,6 +29,15 @@ namespace NodaTime.Test.Calendars
             LocalDateTime startOfEra = new LocalDateTime(1, 1, 1, 0, 0, 0, calendar);
             Assert.AreEqual(Era.Common, startOfEra.Era);
             Assert.AreEqual(Era.BeforeCommon, startOfEra.PlusTicks(-1).Era);
+        }
+
+        [Test]
+        public void AddMonths_BoundaryCondition()
+        {
+            var start = new LocalDate(2017, 8, 20);
+            var end = start.PlusMonths(-19);
+            var expected = new LocalDate(2016, 1, 20);
+            Assert.AreEqual(expected, end);
         }
     }
 }

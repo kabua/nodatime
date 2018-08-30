@@ -23,18 +23,26 @@ namespace NodaTime.Test.TimeZones
         }
 
         [Test]
-        public void InvalidProvider_NullVersionId()
+        public void InvalidSource_NullVersionId()
         {
             var source = new TestDateTimeZoneSource("Test1", "Test2") { VersionId = null };
             Assert.Throws<InvalidDateTimeZoneSourceException>(() => new DateTimeZoneCache(source));
         }
 
         [Test]
-        public void InvalidProvider_NullIdSequence()
+        public void InvalidSource_NullIdSequence()
         {
             string[] ids = null;
             var source = new TestDateTimeZoneSource(ids);
             Assert.Throws<InvalidDateTimeZoneSourceException>(() => new DateTimeZoneCache(source));
+        }
+
+        [Test]
+        public void InvalidSource_ReturnsNullForAdvertisedId()
+        {
+            var source = new NullReturningTestDateTimeZoneSource("foo", "bar");
+            var cache = new DateTimeZoneCache(source);
+            Assert.Throws<InvalidDateTimeZoneSourceException>(() => cache.GetZoneOrNull("foo"));
         }
 
         [Test]
@@ -76,13 +84,13 @@ namespace NodaTime.Test.TimeZones
         }
 
         [Test]
-        public void SourceIsNotAskedForUtcIfAdvertised()
+        public void SourceIsAskedForUtcIfAdvertised()
         {
             var source = new TestDateTimeZoneSource("Test1", "Test2", "UTC");
             var provider = new DateTimeZoneCache(source);
             var zone = provider[DateTimeZone.UtcId];
             Assert.IsNotNull(zone);
-            Assert.IsNull(source.LastRequestedId);
+            Assert.AreEqual("UTC", source.LastRequestedId);
         }
 
         [Test]
@@ -123,15 +131,14 @@ namespace NodaTime.Test.TimeZones
         }
 
         [Test]
-        public void FixedOffsetSucceedsWithoutConsultingSourceWhenAdvertised()
+        public void FixedOffsetConsultsSourceWhenAdvertised()
         {
             string id = "UTC+05:30";
             var source = new TestDateTimeZoneSource("Test1", "Test2", id);
             var provider = new DateTimeZoneCache(source);
             DateTimeZone zone = provider[id];
-            Assert.AreEqual(DateTimeZone.ForOffset(Offset.FromHoursAndMinutes(5, 30)), zone);
             Assert.AreEqual(id, zone.Id);
-            Assert.IsNull(source.LastRequestedId);
+            Assert.AreEqual(id, source.LastRequestedId);
         }
 
         [Test]
@@ -150,7 +157,7 @@ namespace NodaTime.Test.TimeZones
         public void FixedOffsetZeroReturnsUtc()
         {
             string id = "UTC+00:00";
-            var source = new TestDateTimeZoneSource("Test1", "Test2", id);
+            var source = new TestDateTimeZoneSource("Test1", "Test2");
             var provider = new DateTimeZoneCache(source);
             DateTimeZone zone = provider[id];
             Assert.AreEqual(DateTimeZone.Utc, zone);
@@ -236,6 +243,14 @@ namespace NodaTime.Test.TimeZones
             }
         }
 
+        [Test]
+        public void GetSystemDefault_SourceReturnsNullId()
+        {
+            var source = new NullReturningTestDateTimeZoneSource("foo", "bar");
+            var cache = new DateTimeZoneCache(source);
+            Assert.Throws<DateTimeZoneNotFoundException>(() => cache.GetSystemDefault());
+        }
+
         private class TestDateTimeZoneSource : IDateTimeZoneSource
         {
             public string LastRequestedId { get; set; }
@@ -249,19 +264,32 @@ namespace NodaTime.Test.TimeZones
 
             public IEnumerable<string> GetIds() { return ids; }
 
-            public DateTimeZone ForId(string id)
+            public virtual DateTimeZone ForId(string id)
             {
                 LastRequestedId = id;
-                return new SingleTransitionDateTimeZone(NodaConstants.UnixEpoch, 0, id.GetHashCode() % 18);
+                return new SingleTransitionDateTimeZone(NodaConstants.UnixEpoch, Offset.Zero, Offset.FromHours(id.GetHashCode() % 18), id);
             }
 
             public string VersionId { get; set; }
 
+            public virtual string GetSystemDefaultId() => "map";
+        }
 
-            public string MapTimeZoneId(TimeZoneInfo timeZone)
+        // A test source that returns null from ForId and GetSystemDefaultId()
+        private class NullReturningTestDateTimeZoneSource : TestDateTimeZoneSource
+        {
+            public NullReturningTestDateTimeZoneSource(params string[] ids) : base(ids)
             {
-                return "map";
             }
+
+            public override DateTimeZone ForId(string id)
+            {
+                // Still remember what was requested.
+                base.ForId(id);
+                return null;
+            }
+
+            public override string GetSystemDefaultId() => null;
         }
     }
 }

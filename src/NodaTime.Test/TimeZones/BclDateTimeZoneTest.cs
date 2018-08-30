@@ -2,11 +2,9 @@
 // Use of this source code is governed by the Apache License 2.0,
 // as found in the LICENSE.txt file.
 
-#if !PCL
-
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using NUnit.Framework;
 using NodaTime.TimeZones;
 
@@ -14,23 +12,63 @@ namespace NodaTime.Test.TimeZones
 {
     public class BclDateTimeZoneTest
     {
-        // This test is effectively disabled on Mono as its time zone support is broken in the current
-        // stable release - see https://github.com/nodatime/nodatime/issues/97
-        private static readonly ReadOnlyCollection<TimeZoneInfo> BclZonesOrJustNullOnMono = TestHelper.IsRunningOnMono
-            ? new List<TimeZoneInfo> { null }.AsReadOnly() : TimeZoneInfo.GetSystemTimeZones();
+        private static readonly ReadOnlyCollection<TimeZoneInfo> BclZones =
+            TestHelper.IsRunningOnMono ? GetSafeSystemTimeZones() : TimeZoneInfo.GetSystemTimeZones();
+
+        private static readonly object[] BclZonesAndIds =
+            BclZones.Select(zone => new object[] { zone, zone.Id }).ToArray();
+
+        private static ReadOnlyCollection<TimeZoneInfo> GetSafeSystemTimeZones() =>
+             TimeZoneInfo.GetSystemTimeZones()
+                // Filter time zones that have a rule involving Feb 29th, to avoid https://bugzilla.xamarin.com/show_bug.cgi?id=54468
+                .Where(ZoneRulesDontReferToLeapDays)
+                // Recreate all time zones from their rules, to avoid https://bugzilla.xamarin.com/show_bug.cgi?id=54480
+                // Arguably this is invalid, but it means we're testing that Noda Time can do as well as it can feasibly
+                // do based on the rules.
+                .Select(RecreateZone)
+                .ToList()
+                .AsReadOnly();
+
+        private static bool ZoneRulesDontReferToLeapDays(TimeZoneInfo zone) =>
+            !zone.GetAdjustmentRules().Any(rule => TransitionRefersToLeapDay(rule.DaylightTransitionStart) ||
+                                                   TransitionRefersToLeapDay(rule.DaylightTransitionEnd));
+
+        private static bool TransitionRefersToLeapDay(TimeZoneInfo.TransitionTime transition) =>
+            transition.IsFixedDateRule && transition.Month == 2 && transition.Day == 29;
+
+        private static TimeZoneInfo RecreateZone(TimeZoneInfo zone) =>
+            TimeZoneInfo.CreateCustomTimeZone(zone.Id, zone.BaseUtcOffset, zone.DisplayName, zone.StandardName,
+                zone.DisplayName, zone.GetAdjustmentRules());
+
+        // TODO: Check what this does on Mono, both on Windows and Unix.
 
         [Test]
-        [TestCaseSource(nameof(BclZonesOrJustNullOnMono))]
-        public void AllZoneTransitions(TimeZoneInfo windowsZone)
+        [TestCaseSource(nameof(BclZonesAndIds))]
+        public void AreWindowsStyleRules(TimeZoneInfo zone, string id)
         {
-            if (windowsZone == null)
+            var expected = !TestHelper.IsRunningOnDotNetCoreUnix;
+            var rules = zone.GetAdjustmentRules();
+            if (rules is null || rules.Length == 0)
             {
-                Assert.Ignore("Test skipped on Mono");
+                return;
             }
+            Assert.AreEqual(expected, BclDateTimeZone.AreWindowsStyleRules(rules));
+        }
+
+        [Test]
+        [TestCaseSource(nameof(BclZonesAndIds))]
+        [Category("BrokenOnMonoLinux")]
+        public void AllZoneTransitions(TimeZoneInfo windowsZone, string id)
+        {
             var nodaZone = BclDateTimeZone.FromTimeZoneInfo(windowsZone);
 
+            // Currently .NET Core doesn't expose the information we need to determine any DST recurrence
+            // after the final tzif rule. For the moment, limit how far we check.
+            // See https://github.com/dotnet/corefx/issues/17117
+            int endYear = TestHelper.IsRunningOnDotNetCoreUnix ? 2037 : 2050;
+
             Instant instant = Instant.FromUtc(1800, 1, 1, 0, 0);
-            Instant end = Instant.FromUtc(2050, 1, 1, 0, 0);
+            Instant end = Instant.FromUtc(endYear, 1, 1, 0, 0);
 
             while (instant < end)
             {
@@ -40,22 +78,27 @@ namespace NodaTime.Test.TimeZones
             }
         }
 
+        [Test]
+        [TestCaseSource(nameof(BclZonesAndIds))]
+        public void DisplayName(TimeZoneInfo windowsZone, string id)
+        {
+            var nodaZone = BclDateTimeZone.FromTimeZoneInfo(windowsZone);
+            Assert.AreEqual(windowsZone.DisplayName, nodaZone.DisplayName);
+        }
+
         /// <summary>
         /// This test catches situations where the Noda Time representation doesn't have all the
         /// transitions it should; AllZoneTransitions may pass not spot times when we *should* have
         /// a transition, because it only uses the transitions it knows about. Instead, here we
-        /// check each day between 1st January 1950 and 1st January 2050. We use midnight UTC, but
-        /// this is arbitrary. The choice of checking once a week is just practical - it's a relatively
-        /// slow test, mostly because TimeZoneInfo is slow.
+        /// check each week between 1st January 1950 and 1st January 2050 (or 2037, in some cases).
+        /// We use midnight UTC, but this is arbitrary. The choice of checking once a week is just
+        /// practical - it's a relatively slow test, mostly because TimeZoneInfo is slow.
         /// </summary>
         [Test]
-        [TestCaseSource(nameof(BclZonesOrJustNullOnMono))]
-        public void AllZonesEveryWeek(TimeZoneInfo windowsZone)
+        [TestCaseSource(nameof(BclZonesAndIds))]
+        [Category("BrokenOnMonoLinux")]
+        public void AllZonesEveryWeek(TimeZoneInfo windowsZone, string id)
         {
-            if (windowsZone == null)
-            {
-                Assert.Ignore("Test skipped on Mono");
-            }
             ValidateZoneEveryWeek(windowsZone);
         }
 
@@ -76,13 +119,9 @@ namespace NodaTime.Test.TimeZones
         }
 
         [Test]
-        [TestCaseSource(nameof(BclZonesOrJustNullOnMono))]
-        public void AllZonesStartAndEndOfTime(TimeZoneInfo windowsZone)
+        [TestCaseSource(nameof(BclZonesAndIds))]
+        public void AllZonesStartAndEndOfTime(TimeZoneInfo windowsZone, string id)
         {
-            if (windowsZone == null)
-            {
-                Assert.Ignore("Test skipped on Mono");
-            }
             var nodaZone = BclDateTimeZone.FromTimeZoneInfo(windowsZone);
             var firstInterval = nodaZone.GetZoneInterval(Instant.MinValue);
             Assert.IsFalse(firstInterval.HasStart);
@@ -94,8 +133,13 @@ namespace NodaTime.Test.TimeZones
         {
             var nodaZone = BclDateTimeZone.FromTimeZoneInfo(windowsZone);
 
+            // Currently .NET Core doesn't expose the information we need to determine any DST recurrence
+            // after the final tzif rule. For the moment, limit how far we check.
+            // See https://github.com/dotnet/corefx/issues/17117
+            int endYear = TestHelper.IsRunningOnDotNetCoreUnix ? 2037 : 2050;
+
             Instant instant = Instant.FromUtc(1950, 1, 1, 0, 0);
-            Instant end = Instant.FromUtc(2050, 1, 1, 0, 0);
+            Instant end = Instant.FromUtc(endYear, 1, 1, 0, 0);
 
             while (instant < end)
             {
@@ -120,6 +164,11 @@ namespace NodaTime.Test.TimeZones
         [Test]
         public void DateTimeMinValueStartRuleExtendsToBeginningOfTime()
         {
+            // .NET Core on Unix loses data from rules provided to CreateCustomTimeZone :(
+            // (It assumes the rules have been created from tzif files, which isn't the case here.)
+            // See https://github.com/dotnet/corefx/issues/29912
+            Ignore.When(TestHelper.IsRunningOnDotNetCoreUnix, ".NET Core on Unix mangles custom time zones");
+
             var rules = new[]
             {
                 // Rule for the whole of time, with DST of 1 hour commencing on March 1st
@@ -143,19 +192,92 @@ namespace NodaTime.Test.TimeZones
         }
 
         [Test]
-        public void Equality()
+        public void AwkwardLeapYears()
         {
-            if (BclZonesOrJustNullOnMono.Count < 2)
+            // This mimics the data on Mono on Linux for Europe/Malta, where there's a BCL adjustment rule for
+            // each rule for quite a long time. One of those years is 1948, and the daylight transition is Feburary
+            // 29th. That then fails when we try to build a ZoneInterval at the end of that year.
+            // See https://github.com/nodatime/nodatime/issues/743 for more details. We've simplified this to just
+            // a single rule here...
+
+            // Amusingly, trying to reproduce the test on Mono with a custom time zone causes Mono to throw -
+            // quite possibly due to the same root cause that we're testing we've fixed in Noda Time.
+            // See https://bugzilla.xamarin.com/attachment.cgi?id=21192&action=edit
+            Ignore.When(TestHelper.IsRunningOnMono, "Mono throws an exception with awkward leap years");
+
+            // .NET Core on Unix loses data from rules provided to CreateCustomTimeZone :(
+            // (It assumes the rules have been created from tzif files, which isn't the case here.)
+            Ignore.When(TestHelper.IsRunningOnDotNetCoreUnix, ".NET Core on Unix mangles custom time zones");
+
+            var rules = new[]
             {
-                return;
+                TimeZoneInfo.AdjustmentRule.CreateAdjustmentRule(
+                    dateStart: new DateTime(1948, 1, 1),
+                    dateEnd: new DateTime(1949, 1, 1).AddDays(-1),
+                    daylightDelta: TimeSpan.FromHours(1),
+                    daylightTransitionStart: TimeZoneInfo.TransitionTime.CreateFixedDateRule(timeOfDay: new DateTime(1, 1, 1, 2, 0, 0), month: 2, day: 29),
+                    daylightTransitionEnd: TimeZoneInfo.TransitionTime.CreateFixedDateRule(timeOfDay: new DateTime(1, 1, 1, 3, 0, 0), month: 10, day: 3))
+            };
+
+            var bclZone = TimeZoneInfo.CreateCustomTimeZone("Europe/Malta", TimeSpan.Zero, "Malta", "Standard", "Daylight", rules);
+            var nodaZone = BclDateTimeZone.FromTimeZoneInfo(bclZone);
+
+            var expectedTransition1 = Instant.FromUtc(1948, 2, 29, 2, 0, 0);
+            var expectedTransition2 = Instant.FromUtc(1948, 10, 3, 2, 0, 0); // 3am local time
+
+            var zoneIntervalBefore = nodaZone.GetZoneInterval(Instant.FromUtc(1947, 1, 1, 0, 0));
+            Assert.AreEqual(
+                new ZoneInterval("Standard", Instant.BeforeMinValue, expectedTransition1, Offset.Zero, Offset.Zero),
+                zoneIntervalBefore);
+
+            var daylightZoneInterval = nodaZone.GetZoneInterval(Instant.FromUtc(1948, 6, 1, 0, 0));
+            Assert.AreEqual(
+                new ZoneInterval("Daylight", expectedTransition1, expectedTransition2, Offset.FromHours(1), Offset.FromHours(1)),
+                daylightZoneInterval);
+
+            var zoneIntervalAfter = nodaZone.GetZoneInterval(Instant.FromUtc(1949, 1, 1, 0, 0));
+            Assert.AreEqual(
+                new ZoneInterval("Standard", expectedTransition2, Instant.AfterMaxValue, Offset.Zero, Offset.Zero),
+                zoneIntervalAfter);
+        }
+
+        [Test]
+        public void LocalZoneIsNull()
+        {
+            var systemZone = TimeZoneInfo.CreateCustomTimeZone("Normal zone", TimeSpan.Zero, "Display", "Standard");
+            using (TimeZoneInfoReplacer.Replace(null, systemZone))
+            {
+                Assert.Throws<InvalidOperationException>(() => BclDateTimeZone.ForSystemDefault());
             }
-            var firstEqual = BclDateTimeZone.FromTimeZoneInfo(BclZonesOrJustNullOnMono[0]);
-            var secondEqual = BclDateTimeZone.FromTimeZoneInfo(BclZonesOrJustNullOnMono[0]);
-            var unequal = BclDateTimeZone.FromTimeZoneInfo(BclZonesOrJustNullOnMono[1]);
-            Assert.AreEqual(firstEqual, secondEqual);
-            Assert.AreEqual(firstEqual.GetHashCode(), secondEqual.GetHashCode());
-            Assert.AreNotSame(firstEqual, secondEqual);
-            Assert.AreNotEqual(firstEqual, unequal);
+        }
+
+        [Test]
+        public void FakeDaylightSavingTime()
+        {
+            // .NET Core on Unix loses data from rules provided to CreateCustomTimeZone :(
+            // (It assumes the rules have been created from tzif files, which isn't the case here.)
+            Ignore.When(TestHelper.IsRunningOnDotNetCoreUnix, ".NET Core on Unix mangles custom time zones");
+
+            // Linux time zones on Mono can have a strange situation with a "0 savings" adjustment rule to represent
+            // "we want to change standard time but we can't".
+            // See https://github.com/nodatime/nodatime/issues/746
+            // Normally the odd rule would only be in place for a year, but it's simplest to just make it all the time.
+            // We go into daylight savings at midday on March 10th, and out again at midday on September 25.
+
+            // We should be able to use DateTime.MaxValue for dateEnd, but not in .NET 4.5 apparently.
+            var rule = TimeZoneInfo.AdjustmentRule.CreateAdjustmentRule(DateTime.MinValue, new DateTime(9999, 12, 31), TimeSpan.Zero,
+                TimeZoneInfo.TransitionTime.CreateFixedDateRule(new DateTime(1, 1, 1, 12, 0, 0), 3, 10),
+                TimeZoneInfo.TransitionTime.CreateFixedDateRule(new DateTime(1, 1, 1, 12, 0, 0), 9, 25));
+            var bclZone = TimeZoneInfo.CreateCustomTimeZone("Nasty", TimeSpan.FromHours(4), "Display", "Standard", "Daylight", new[] { rule });
+            var nodaZone = BclDateTimeZone.FromTimeZoneInfo(bclZone);
+            var winterInterval = nodaZone.GetZoneInterval(Instant.FromUtc(2017, 2, 1, 0, 0));
+            var summerInterval = nodaZone.GetZoneInterval(Instant.FromUtc(2017, 6, 1, 0, 0));
+
+            var expectedWinter = new ZoneInterval("Standard", Instant.FromUtc(2016, 9, 25, 8, 0), Instant.FromUtc(2017, 3, 10, 8, 0), Offset.FromHours(4), Offset.Zero);
+            var expectedSummer = new ZoneInterval("Daylight", Instant.FromUtc(2017, 3, 10, 8, 0), Instant.FromUtc(2017, 9, 25, 8, 0), Offset.FromHours(4), Offset.FromHours(1));
+
+            Assert.AreEqual(expectedWinter, winterInterval);
+            Assert.AreEqual(expectedSummer, summerInterval);
         }
 
         private void ValidateZoneEquality(Instant instant, DateTimeZone nodaZone, TimeZoneInfo windowsZone)
@@ -183,12 +305,11 @@ namespace NodaTime.Test.TimeZones
             }
             var nodaOffset = interval.WallOffset;
             var windowsOffset = windowsZone.GetUtcOffset(instant.ToDateTimeUtc());
-            Assert.AreEqual(windowsOffset, nodaOffset.ToTimeSpan(), $"Incorrect offset at {instant} in interval {interval}");
+            Assert.AreEqual(windowsOffset, nodaOffset.ToTimeSpan(), "Incorrect offset at {0} in interval {1}", instant, interval);
             var bclDaylight = windowsZone.IsDaylightSavingTime(instant.ToDateTimeUtc());
             Assert.AreEqual(bclDaylight, interval.Savings != Offset.Zero,
-                $"At {instant}, BCL IsDaylightSavingTime={bclDaylight}; Noda savings={interval.Savings}");
+                "At {0}, BCL IsDaylightSavingTime={1}; Noda savings={2}",
+                instant, bclDaylight, interval.Savings);
         }
     }
 }
-
-#endif

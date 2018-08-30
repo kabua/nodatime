@@ -8,16 +8,18 @@
 *.user
 *.sln.cache
 .vs
+.vscode
 
 # IDE add-ins
 *.dotCover
 *.ncrunchproject
 *.ncrunchsolution
-_NCrunch*    # cache directories
-.resharper   # solution
-*.ReSharper  # project
-_ReSharper*  # directories
+_NCrunch*
+.resharper
+*.ReSharper
+_ReSharper*
 StyleCop.Cache
+.cr
 
 # Auto-created thumbnails
 Thumbs.db
@@ -41,9 +43,7 @@ TestResult.xml
 
 # Temporary build output directories
 /build/tmp
-
-# NuGet packages (but not the configuration)
-/src/packages/**/**
+/build/releasebuild
 
 # Local copy of benchmark data and Mercurial/Git logs, used for testing the dynamic part of the web site
 /src/NodaTime.Web/benchmarkdata/**
@@ -53,9 +53,11 @@ TestResult.xml
 # Roslyn temporary files
 /src/*.sln.ide/**
 
-# Generated packages/projects
-/src/NodaTime-Core-*.sln
-/src/**/*-*.csproj
+# BenchmarkDotNet output
+BenchmarkDotNet.Artifacts
 
-# DNX files
-project.lock.json
+# Packages installed during the build
+packages
+coverage
+src/NodaTime.Web/docfx
+build/history

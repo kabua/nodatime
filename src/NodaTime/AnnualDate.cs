@@ -3,6 +3,7 @@
 // as found in the LICENSE.txt file.
 using JetBrains.Annotations;
 using NodaTime.Calendars;
+using NodaTime.Text;
 using NodaTime.Utility;
 using System;
 using System.Globalization;
@@ -16,7 +17,7 @@ namespace NodaTime
     /// <remarks>In the future, this struct may be expanded to support other calendar systems,
     /// but this does not generalize terribly cleanly, particularly to the Hebrew calendar system
     /// with its leap month.</remarks>
-    public struct AnnualDate : IEquatable<AnnualDate>, IComparable<AnnualDate>
+    public readonly struct AnnualDate : IEquatable<AnnualDate>, IComparable<AnnualDate>, IFormattable
     {
         // The underlying value. We only care about the month and day, but for the sake of
         // compatibility with the default value, this ends up being in year 1. This would
@@ -78,17 +79,14 @@ namespace NodaTime
 
         /// <summary>
         /// Checks whether the specified year forms a valid date with the month/day in this
-        /// value, without any truncation. This will always return <code>true</code> except
+        /// value, without any truncation. This will always return <c>true</c> except
         /// for values representing February 29th, where the specified year is a non leap year.
         /// </summary>
         /// <param name="year">The year to test for validity</param>
-        /// <returns><code>true</code> if the current value occurs within the given year;
-        /// <code>false</code> otherwise.</returns>
+        /// <returns><c>true</c> if the current value occurs within the given year;
+        /// <c>false</c> otherwise.</returns>
         [Pure]
-        public bool IsValidYear(int year)
-        {
-            return Month != 2 || Day != 29 || CalendarSystem.Iso.IsLeapYear(year);
-        }
+        public bool IsValidYear(int year) => Month != 2 || Day != 29 || CalendarSystem.Iso.IsLeapYear(year);
 
         /// <summary>
         /// Compares this annual date with the specified reference. An annual date is
@@ -102,21 +100,31 @@ namespace NodaTime
         /// Returns a hash code for this annual date.
         /// </summary>
         /// <returns>A hash code for this annual date.</returns>
-        public override int GetHashCode()
-        {
-            return value.RawValue;
-        }
+        public override int GetHashCode() => value.GetHashCode();
 
         /// <summary>
         /// Returns a <see cref="System.String" /> that represents this instance.
         /// </summary>
         /// <returns>
-        /// The value of the current instance, in the form MM-dd.
+        /// The value of the current instance in the default format pattern ("G").
         /// </returns>
-        public override string ToString()
-        {
-            return string.Format(CultureInfo.InvariantCulture, "{0:00}-{1:00}", value.Month, value.Day);
-        }
+        public override string ToString() => AnnualDatePattern.BclSupport.Format(this, null, CultureInfo.CurrentCulture);
+
+        /// <summary>
+        /// Formats the value of the current instance using the specified pattern.
+        /// </summary>
+        /// <returns>
+        /// A <see cref="T:System.String" /> containing the value of the current instance in the specified format.
+        /// </returns>
+        /// <param name="patternText">The <see cref="T:System.String" /> specifying the pattern to use,
+        /// or null to use the default format pattern ("G").
+        /// </param>
+        /// <param name="formatProvider">The <see cref="T:System.IFormatProvider" /> to use when formatting the value,
+        /// or null to use the current thread's culture to obtain a format provider.
+        /// </param>
+        /// <filterpriority>2</filterpriority>
+        public string ToString(string patternText, IFormatProvider formatProvider) =>
+            AnnualDatePattern.BclSupport.Format(this, patternText, formatProvider);
 
         /// <summary>
         /// Compares this annual date with the specified one for equality,
@@ -124,10 +132,7 @@ namespace NodaTime
         /// </summary>
         /// <param name="other">The other annual date to compare this one with</param>
         /// <returns>True if the specified annual date is equal to this one; false otherwise</returns>
-        public bool Equals(AnnualDate other)
-        {
-            return value == other.value;
-        }
+        public bool Equals(AnnualDate other) => value == other.value;
 
         /// <summary>
         /// Indicates whether this annual date is earlier, later or the same as another one.
@@ -136,10 +141,7 @@ namespace NodaTime
         /// <returns>A value less than zero if this annual date is earlier than <paramref name="other"/>;
         /// zero if this time is the same as <paramref name="other"/>; a value greater than zero if this annual date is
         /// later than <paramref name="other"/>.</returns>
-        public int CompareTo(AnnualDate other)
-        {
-            return value.CompareTo(other.value);
-        }
+        public int CompareTo(AnnualDate other) => value.CompareTo(other.value);
 
         /// <summary>
         /// Compares two <see cref="AnnualDate" /> values for equality.
@@ -166,10 +168,7 @@ namespace NodaTime
         /// <exception cref="ArgumentException">The calendar system of <paramref name="rhs"/> is not the same
         /// as the calendar of <paramref name="lhs"/>.</exception>
         /// <returns>true if the <paramref name="lhs"/> is strictly earlier than <paramref name="rhs"/>, false otherwise.</returns>
-        public static bool operator <(AnnualDate lhs, AnnualDate rhs)
-        {
-            return lhs.CompareTo(rhs) < 0;
-        }
+        public static bool operator <(AnnualDate lhs, AnnualDate rhs) => lhs.CompareTo(rhs) < 0;
 
         /// <summary>
         /// Compares two annual dates to see if the left one is earlier than or equal to the right
@@ -178,10 +177,7 @@ namespace NodaTime
         /// <param name="lhs">First operand of the comparison</param>
         /// <param name="rhs">Second operand of the comparison</param>
         /// <returns>true if the <paramref name="lhs"/> is earlier than or equal to <paramref name="rhs"/>, false otherwise.</returns>
-        public static bool operator <=(AnnualDate lhs, AnnualDate rhs)
-        {
-            return lhs.CompareTo(rhs) <= 0;
-        }
+        public static bool operator <=(AnnualDate lhs, AnnualDate rhs) => lhs.CompareTo(rhs) <= 0;
 
         /// <summary>
         /// Compares two annual dates to see if the left one is strictly later than the right
@@ -190,10 +186,7 @@ namespace NodaTime
         /// <param name="lhs">First operand of the comparison</param>
         /// <param name="rhs">Second operand of the comparison</param>
         /// <returns>true if the <paramref name="lhs"/> is strictly later than <paramref name="rhs"/>, false otherwise.</returns>
-        public static bool operator >(AnnualDate lhs, AnnualDate rhs)
-        {
-            return lhs.CompareTo(rhs) > 0;
-        }
+        public static bool operator >(AnnualDate lhs, AnnualDate rhs) => lhs.CompareTo(rhs) > 0;
 
         /// <summary>
         /// Compares two annual dates to see if the left one is later than or equal to the right
@@ -202,9 +195,6 @@ namespace NodaTime
         /// <param name="lhs">First operand of the comparison</param>
         /// <param name="rhs">Second operand of the comparison</param>
         /// <returns>true if the <paramref name="lhs"/> is later than or equal to <paramref name="rhs"/>, false otherwise.</returns>
-        public static bool operator >=(AnnualDate lhs, AnnualDate rhs)
-        {
-            return lhs.CompareTo(rhs) >= 0;
-        }
+        public static bool operator >=(AnnualDate lhs, AnnualDate rhs) => lhs.CompareTo(rhs) >= 0;
     }
 }

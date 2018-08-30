@@ -17,8 +17,7 @@ namespace NodaTime.Test
             Assert.AreEqual(1970, date.Year);
             Assert.AreEqual(1970, date.YearOfEra);
             Assert.AreEqual(1, date.Day);
-            Assert.AreEqual((int) IsoDayOfWeek.Thursday, date.DayOfWeek);
-            Assert.AreEqual(IsoDayOfWeek.Thursday, date.IsoDayOfWeek);
+            Assert.AreEqual(IsoDayOfWeek.Thursday, date.DayOfWeek);
             Assert.AreEqual(1, date.DayOfYear);
             Assert.AreEqual(1, date.Month);
         }
@@ -34,14 +33,13 @@ namespace NodaTime.Test
             Assert.AreEqual(2011, date.Year);
             Assert.AreEqual(2011, date.YearOfEra);
             Assert.AreEqual(5, date.Day);
-            Assert.AreEqual((int)IsoDayOfWeek.Saturday, date.DayOfWeek);
-            Assert.AreEqual(IsoDayOfWeek.Saturday, date.IsoDayOfWeek);
+            Assert.AreEqual(IsoDayOfWeek.Saturday, date.DayOfWeek);
             Assert.AreEqual(64, date.DayOfYear);
             Assert.AreEqual(3, date.Month);
         }
 
         [Test]
-        public void IsoDayOfWeek_AroundEpoch()
+        public void DayOfWeek_AroundEpoch()
         {
             // Test about couple of months around the Unix epoch. If that works, I'm confident the rest will.
             LocalDate date = new LocalDate(1969, 12, 1);
@@ -49,7 +47,7 @@ namespace NodaTime.Test
             {
                 Assert.AreEqual(
                     BclConversions.ToIsoDayOfWeek(date.AtMidnight().ToDateTimeUnspecified().DayOfWeek),
-                    date.IsoDayOfWeek);
+                    date.DayOfWeek);
                 date = date.PlusDays(1);
             }
         }

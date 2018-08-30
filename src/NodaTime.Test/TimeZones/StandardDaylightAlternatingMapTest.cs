@@ -2,10 +2,12 @@
 // Use of this source code is governed by the Apache License 2.0,
 // as found in the LICENSE.txt file.
 
-using System.Collections.Generic;
 using System.Linq;
 using NodaTime.TimeZones;
 using NUnit.Framework;
+using System.IO;
+using NodaTime.TimeZones.IO;
+using System;
 
 namespace NodaTime.Test.TimeZones
 {
@@ -186,6 +188,60 @@ namespace NodaTime.Test.TimeZones
         }
 
         [Test]
+        public void Equality()
+        {
+            // Order of recurrences doesn't matter
+            var map1 = new StandardDaylightAlternatingMap(Offset.FromHours(1), Summer, Winter);
+            var map2 = new StandardDaylightAlternatingMap(Offset.FromHours(1), Winter, Summer);
+            var map3 = new StandardDaylightAlternatingMap(Offset.FromHours(1), Winter,
+                // Summer, but starting from 1900
+                new ZoneRecurrence("Summer", Offset.FromHours(1),
+                    new ZoneYearOffset(TransitionMode.Wall, 3, 10, 0, false, new LocalTime(1, 0)), 1900, int.MaxValue));
+            // Standard offset does matter
+            var map4 = new StandardDaylightAlternatingMap(Offset.FromHours(0), Summer, Winter);
+
+            TestHelper.TestEqualsClass(map1, map2, map4);
+            TestHelper.TestEqualsClass(map1, map3, map4);
+            
+            // Recurrences like Summer, but different in one aspect each, *except* 
+            var unequalMaps = new[]
+            {
+                new ZoneRecurrence("Different name", Offset.FromHours(1),
+                    new ZoneYearOffset(TransitionMode.Wall, 3, 10, 0, false, new LocalTime(1, 0)), 2000, int.MaxValue),
+                new ZoneRecurrence("Summer", Offset.FromHours(2),
+                    new ZoneYearOffset(TransitionMode.Wall, 3, 10, 0, false, new LocalTime(1, 0)), 2000, int.MaxValue),
+                new ZoneRecurrence("Summer", Offset.FromHours(1),
+                    new ZoneYearOffset(TransitionMode.Standard, 3, 10, 0, false, new LocalTime(1, 0)), 2000, int.MaxValue),
+                new ZoneRecurrence("Summer", Offset.FromHours(1),
+                    new ZoneYearOffset(TransitionMode.Wall, 4, 10, 0, false, new LocalTime(1, 0)), 2000, int.MaxValue),
+                new ZoneRecurrence("Summer", Offset.FromHours(1),
+                    new ZoneYearOffset(TransitionMode.Wall, 3, 9, 0, false, new LocalTime(1, 0)), 2000, int.MaxValue),
+                new ZoneRecurrence("Summer", Offset.FromHours(1),
+                    new ZoneYearOffset(TransitionMode.Wall, 3, 10, 1, false, new LocalTime(1, 0)), 2000, int.MaxValue),
+                // Advance with day-of-week 0 doesn't make any real difference, but they compare non-equal...
+                new ZoneRecurrence("Summer", Offset.FromHours(1),
+                    new ZoneYearOffset(TransitionMode.Wall, 3, 10, 0, true, new LocalTime(1, 0)), 2000, int.MaxValue),
+                new ZoneRecurrence("Summer", Offset.FromHours(1),
+                    new ZoneYearOffset(TransitionMode.Wall, 3, 10, 0, false, new LocalTime(2, 0)), 2000, int.MaxValue)
+            }.Select(recurrence => new StandardDaylightAlternatingMap(Offset.FromHours(1), Winter, recurrence)).ToArray();
+            TestHelper.TestEqualsClass(map1, map2, unequalMaps);
+        }
+
+        [Test]
+        public void ReadWrite()
+        {
+            var map1 = new StandardDaylightAlternatingMap(Offset.FromHours(1), Summer, Winter);
+            var stream = new MemoryStream();
+            var writer = new DateTimeZoneWriter(stream, null);
+            map1.Write(writer);
+            stream.Position = 0;
+
+            var reader = new DateTimeZoneReader(stream, null);
+            var map2 = StandardDaylightAlternatingMap.Read(reader);
+            Assert.AreEqual(map1, map2);
+        }
+
+        [Test]
         public void Extremes()
         {
             ZoneRecurrence winter = new ZoneRecurrence("Winter", Offset.Zero,
@@ -220,6 +276,21 @@ namespace NodaTime.Test.TimeZones
             Assert.AreEqual(lastWinter, zone.GetZoneInterval(lastAutumn));
             Assert.AreEqual(lastWinter, zone.GetZoneInterval(Instant.FromUtc(9999, 11, 1, 0, 0)));
             Assert.AreEqual(lastWinter, zone.GetZoneInterval(Instant.MaxValue));
+        }
+
+        [Test]
+        public void InvalidMap_SimultaneousTransition()
+        {
+            // Two recurrences with different savings, but which occur at the same instant in time every year.
+            ZoneRecurrence r1 = new ZoneRecurrence("Recurrence1", Offset.Zero,
+                new ZoneYearOffset(TransitionMode.Utc, 10, 5, 0, false, new LocalTime(2, 0)), int.MinValue, int.MaxValue);
+
+            ZoneRecurrence r2 = new ZoneRecurrence("Recurrence2", Offset.FromHours(1),
+                new ZoneYearOffset(TransitionMode.Utc, 10, 5, 0, false, new LocalTime(2, 0)), int.MinValue, int.MaxValue);
+
+            var map = new StandardDaylightAlternatingMap(Offset.Zero, r1, r2);
+
+            Assert.Throws<InvalidOperationException>(() => map.GetZoneInterval(Instant.FromUtc(2017, 8, 25, 0, 0, 0)));
         }
 
         private void CheckMapping(ZoneLocalMapping mapping, string earlyIntervalName, string lateIntervalName, int count)

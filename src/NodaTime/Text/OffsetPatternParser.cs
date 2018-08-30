@@ -5,10 +5,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Globalization;
 using System.Text;
 using NodaTime.Globalization;
-using NodaTime.Properties;
 using NodaTime.Text.Patterns;
 using NodaTime.Utility;
 using JetBrains.Annotations;
@@ -25,7 +23,7 @@ namespace NodaTime.Text
             { '\"', SteppedPatternBuilder<Offset, OffsetParseBucket>.HandleQuote },
             { '\\', SteppedPatternBuilder<Offset, OffsetParseBucket>.HandleBackslash },
             { ':', (pattern, builder) => builder.AddLiteral(builder.FormatInfo.TimeSeparator, ParseResult<Offset>.TimeSeparatorMismatch) },
-            { 'h', (pattern, builder) => { throw new InvalidPatternException(Messages.Parse_Hour12PatternNotSupported, typeof(Offset)); } },
+            { 'h', (pattern, builder) => { throw new InvalidPatternException(TextErrorMessages.Hour12PatternNotSupported, typeof(Offset)); } },
             { 'H', SteppedPatternBuilder<Offset, OffsetParseBucket>.HandlePaddedField
                        (2, PatternFields.Hours24, 0, 23, GetPositiveHours, (bucket, value) => bucket.Hours = value) },
             { 'm', SteppedPatternBuilder<Offset, OffsetParseBucket>.HandlePaddedField
@@ -34,7 +32,7 @@ namespace NodaTime.Text
                        (2, PatternFields.Seconds, 0, 59, GetPositiveSeconds, (bucket, value) => bucket.Seconds = value) },
             { '+', HandlePlus },
             { '-', HandleMinus },
-            { 'Z', (ignored1, ignored2) => { throw new InvalidPatternException(Messages.Parse_ZPrefixNotAtStartOfPattern); } }
+            { 'Z', (ignored1, ignored2) => { throw new InvalidPatternException(TextErrorMessages.ZPrefixNotAtStartOfPattern); } }
         };
 
         // These are used to compute the individual (always-positive) components of an offset.
@@ -55,7 +53,7 @@ namespace NodaTime.Text
             // Nullity check is performed in OffsetPattern.
             if (patternText.Length == 0)
             {
-                throw new InvalidPatternException(Messages.Parse_FormatStringEmpty);
+                throw new InvalidPatternException(TextErrorMessages.FormatStringEmpty);
             }
 
             if (patternText.Length == 1)
@@ -63,13 +61,23 @@ namespace NodaTime.Text
                 switch (patternText)
                 {
                     case "g":
-                        return CreateGeneralPattern(formatInfo, "lms");
+                        return new CompositePatternBuilder<Offset>
+                        {
+                            { ParsePartialPattern(formatInfo.OffsetPatternLong, formatInfo), offset => true },
+                            { ParsePartialPattern(formatInfo.OffsetPatternMedium, formatInfo), HasZeroSeconds },
+                            { ParsePartialPattern(formatInfo.OffsetPatternShort, formatInfo), HasZeroSecondsAndMinutes },
+                        }.BuildAsPartial();
                     case "G":
-                        return new ZPrefixPattern(CreateGeneralPattern(formatInfo, "lms"));
+                        return new ZPrefixPattern(ParsePartialPattern("g", formatInfo));
                     case "i":
-                        return CreateGeneralPattern(formatInfo, "LMS");
+                        return new CompositePatternBuilder<Offset>
+                        {
+                            { ParsePartialPattern(formatInfo.OffsetPatternLongNoPunctuation, formatInfo), offset => true },
+                            { ParsePartialPattern(formatInfo.OffsetPatternMediumNoPunctuation, formatInfo), HasZeroSeconds },
+                            { ParsePartialPattern(formatInfo.OffsetPatternShortNoPunctuation, formatInfo), HasZeroSecondsAndMinutes },
+                        }.BuildAsPartial();
                     case "I":
-                        return new ZPrefixPattern(CreateGeneralPattern(formatInfo, "LMS"));
+                        return new ZPrefixPattern(ParsePartialPattern("i", formatInfo));
                     case "l":
                         patternText = formatInfo.OffsetPatternLong;
                         break;
@@ -89,13 +97,13 @@ namespace NodaTime.Text
                         patternText = formatInfo.OffsetPatternShortNoPunctuation;
                         break;
                     default:
-                        throw new InvalidPatternException(Messages.Parse_UnknownStandardFormat, patternText, typeof(Offset));
+                        throw new InvalidPatternException(TextErrorMessages.UnknownStandardFormat, patternText, typeof(Offset));
                 }
             }
             // This is the only way we'd normally end up in custom parsing land for Z on its own.
             if (patternText == "%Z")
             {
-                throw new InvalidPatternException(Messages.Parse_EmptyZPrefixedOffsetPattern);
+                throw new InvalidPatternException(TextErrorMessages.EmptyZPrefixedOffsetPattern);
             }
 
             // Handle Z-prefix by stripping it, parsing the rest as a normal pattern, then building a special pattern
@@ -110,40 +118,14 @@ namespace NodaTime.Text
             return zPrefix ? new ZPrefixPattern(pattern) : pattern;
         }
 
-        #region Standard patterns
-
-        private IPartialPattern<Offset> CreateGeneralPattern(NodaFormatInfo formatInfo, string standardPatterns)
-        {
-            var patterns = new List<IPartialPattern<Offset>>();
-            foreach (char c in standardPatterns)
-            {
-                patterns.Add(ParsePartialPattern(c.ToString(), formatInfo));
-            }
-            Func<Offset, IPartialPattern<Offset>> formatter = value => PickGeneralFormatter(value, patterns);
-            return new CompositePattern<Offset>(patterns, formatter);
-        }
-
-        private static IPartialPattern<Offset> PickGeneralFormatter(Offset value, List<IPartialPattern<Offset>> patterns)
-        {
-            // Note: this relies on the order in ExpandStandardFormatPattern
-            int index;
-            // Work out the least significant non-zero part.
-            int absoluteSeconds = Math.Abs(value.Seconds);
-            if (absoluteSeconds % NodaConstants.SecondsPerMinute != 0)
-            {
-                index = 0;
-            }
-            else if ((absoluteSeconds % NodaConstants.SecondsPerHour) / NodaConstants.SecondsPerMinute != 0)
-            {
-                index = 1;
-            }
-            else
-            {
-                index = 2;
-            }
-            return patterns[index];
-        }
-        #endregion
+        /// <summary>
+        /// Returns true if the offset is representable just in hours and minutes (no seconds).
+        /// </summary>
+        private static bool HasZeroSeconds(Offset offset) => (offset.Seconds % NodaConstants.SecondsPerMinute) == 0;
+        /// <summary>
+        /// Returns true if the offset is representable just in hours (no minutes or seconds).
+        /// </summary>
+        private static bool HasZeroSecondsAndMinutes(Offset offset) => (offset.Seconds % NodaConstants.SecondsPerHour) == 0;
 
         /// <summary>
         /// Pattern which optionally delegates to another, but both parses and formats Offset.Zero as "Z".

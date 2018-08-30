@@ -2,13 +2,11 @@
 // Use of this source code is governed by the Apache License 2.0,
 // as found in the LICENSE.txt file.
 
-using static NodaTime.NodaConstants;
-
-using System.Text;
-using NodaTime.Annotations;
-using NodaTime.Properties;
-using NodaTime.Utility;
 using JetBrains.Annotations;
+using NodaTime.Annotations;
+using NodaTime.Utility;
+using System.Text;
+using static NodaTime.NodaConstants;
 
 namespace NodaTime.Text
 {
@@ -26,7 +24,11 @@ namespace NodaTime.Text
         /// Each element may also be negative, independently of other elements. This pattern round-trips its
         /// values: a parse/format cycle will produce an identical period, including units.
         /// </summary>
-        public static PeriodPattern RoundtripPattern { get; } = new PeriodPattern(new RoundtripPatternImpl());
+        /// <value>
+        /// Pattern which uses the normal ISO format for all the supported ISO
+        /// fields, but extends the time part with "s" for milliseconds, "t" for ticks and "n" for nanoseconds.
+        /// </value>
+        [NotNull] public static PeriodPattern Roundtrip { get; } = new PeriodPattern(new RoundtripPatternImpl());
 
         /// <summary>
         /// A "normalizing" pattern which abides by the ISO-8601 duration format as far as possible.
@@ -40,7 +42,8 @@ namespace NodaTime.Text
         /// combined weeks/days/time portions are considered. Such a period could never
         /// be useful anyway, however.
         /// </remarks>
-        public static PeriodPattern NormalizingIsoPattern { get; } = new PeriodPattern(new NormalizingIsoPatternImpl());
+        /// <value>A "normalizing" pattern which abides by the ISO-8601 duration format as far as possible.</value>
+        [NotNull] public static PeriodPattern NormalizingIso { get; } = new PeriodPattern(new NormalizingIsoPatternImpl());
 
         private readonly IPattern<Period> pattern;
 
@@ -58,14 +61,14 @@ namespace NodaTime.Text
         /// </remarks>
         /// <param name="text">The text value to parse.</param>
         /// <returns>The result of parsing, which may be successful or unsuccessful.</returns>
-        public ParseResult<Period> Parse(string text) => pattern.Parse(text);
+        [NotNull] public ParseResult<Period> Parse([SpecialNullHandling] string text) => pattern.Parse(text);
 
         /// <summary>
         /// Formats the given period as text according to the rules of this pattern.
         /// </summary>
         /// <param name="value">The period to format.</param>
         /// <returns>The period formatted according to this pattern.</returns>
-        public string Format(Period value) => pattern.Format(value);
+        [NotNull] public string Format([NotNull] Period value) => pattern.Format(value);
 
         /// <summary>
         /// Formats the given value as text according to the rules of this pattern,
@@ -74,7 +77,7 @@ namespace NodaTime.Text
         /// <param name="value">The value to format.</param>
         /// <param name="builder">The <c>StringBuilder</c> to append to.</param>
         /// <returns>The builder passed in as <paramref name="builder"/>.</returns>
-        public StringBuilder AppendFormat(Period value, [NotNull] StringBuilder builder) => pattern.AppendFormat(value, builder);
+        [NotNull] public StringBuilder AppendFormat([NotNull] Period value, [NotNull] StringBuilder builder) => pattern.AppendFormat(value, builder);
 
         private static void AppendValue(StringBuilder builder, long value, string suffix)
         {
@@ -87,17 +90,17 @@ namespace NodaTime.Text
             builder.Append(suffix);
         }
 
-        private static ParseResult<Period> InvalidUnit(ValueCursor cursor, char unitCharacter) => ParseResult<Period>.ForInvalidValue(cursor, Messages.Parse_InvalidUnitSpecifier, unitCharacter);
+        private static ParseResult<Period> InvalidUnit(ValueCursor cursor, char unitCharacter) => ParseResult<Period>.ForInvalidValue(cursor, TextErrorMessages.InvalidUnitSpecifier, unitCharacter);
 
-        private static ParseResult<Period> RepeatedUnit(ValueCursor cursor, char unitCharacter) => ParseResult<Period>.ForInvalidValue(cursor, Messages.Parse_RepeatedUnitSpecifier, unitCharacter);
+        private static ParseResult<Period> RepeatedUnit(ValueCursor cursor, char unitCharacter) => ParseResult<Period>.ForInvalidValue(cursor, TextErrorMessages.RepeatedUnitSpecifier, unitCharacter);
 
-        private static ParseResult<Period> MisplacedUnit(ValueCursor cursor, char unitCharacter) => ParseResult<Period>.ForInvalidValue(cursor, Messages.Parse_MisplacedUnitSpecifier, unitCharacter);
+        private static ParseResult<Period> MisplacedUnit(ValueCursor cursor, char unitCharacter) => ParseResult<Period>.ForInvalidValue(cursor, TextErrorMessages.MisplacedUnitSpecifier, unitCharacter);
 
         private sealed class RoundtripPatternImpl : IPattern<Period>
-        {            
+        {
             public ParseResult<Period> Parse(string text)
             {
-                if (text == null)
+                if (text is null)
                 {
                     return ParseResult<Period>.ArgumentNull("text");
                 }
@@ -107,7 +110,7 @@ namespace NodaTime.Text
                 }
 
                 ValueCursor valueCursor = new ValueCursor(text);
-                
+
                 valueCursor.MoveNext();
                 if (valueCursor.Current != 'P')
                 {
@@ -118,13 +121,12 @@ namespace NodaTime.Text
                 PeriodUnits unitsSoFar = 0;
                 while (valueCursor.MoveNext())
                 {
-                    long unitValue;
                     if (inDate && valueCursor.Current == 'T')
                     {
                         inDate = false;
                         continue;
                     }
-                    var failure = valueCursor.ParseInt64<Period>(out unitValue);
+                    var failure = valueCursor.ParseInt64<Period>(out long unitValue);
                     if (failure != null)
                     {
                         return failure;
@@ -204,10 +206,10 @@ namespace NodaTime.Text
 
         private sealed class NormalizingIsoPatternImpl : IPattern<Period>
         {
-            // TODO: Tidy this up a *lot*.
+            // TODO(misc): Tidy this up a *lot*.
             public ParseResult<Period> Parse(string text)
             {
-                if (text == null)
+                if (text is null)
                 {
                     return ParseResult<Period>.ArgumentNull("text");
                 }
@@ -228,14 +230,13 @@ namespace NodaTime.Text
                 PeriodUnits unitsSoFar = 0;
                 while (valueCursor.MoveNext())
                 {
-                    long unitValue;
                     if (inDate && valueCursor.Current == 'T')
                     {
                         inDate = false;
                         continue;
                     }
                     bool negative = valueCursor.Current == '-';
-                    var failure = valueCursor.ParseInt64<Period>(out unitValue);
+                    var failure = valueCursor.ParseInt64<Period>(out long unitValue);
                     if (failure != null)
                     {
                         return failure;
@@ -297,9 +298,8 @@ namespace NodaTime.Text
                         {
                             return ParseResult<Period>.MissingNumber(valueCursor);
                         }
-                        int totalNanoseconds;
                         // Can cope with at most 999999999 nanoseconds
-                        if (!valueCursor.ParseFraction(9, 9, out totalNanoseconds, 1))
+                        if (!valueCursor.ParseFraction(9, 9, out int totalNanoseconds, 1))
                         {
                             return ParseResult<Period>.MissingNumber(valueCursor);
                         }
@@ -329,7 +329,7 @@ namespace NodaTime.Text
                 }
                 if (unitsSoFar == 0)
                 {
-                    return ParseResult<Period>.ForInvalidValue(valueCursor, Messages.Parse_EmptyPeriod);
+                    return ParseResult<Period>.ForInvalidValue(valueCursor, TextErrorMessages.EmptyPeriod);
                 }
                 return ParseResult<Period>.ForValue(builder.Build());
             }

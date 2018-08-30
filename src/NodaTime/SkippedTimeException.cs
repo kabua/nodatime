@@ -34,9 +34,6 @@ namespace NodaTime
     /// <threadsafety>Any public static members of this type are thread safe. Any instance members are not guaranteed to be thread safe.
     /// See the thread safety section of the user guide for more information.
     /// </threadsafety>
-#if !PCL
-    [Serializable]
-#endif
     [Mutable] // Exception itself is mutable
     public sealed class SkippedTimeException : ArgumentOutOfRangeException
     {
@@ -50,7 +47,7 @@ namespace NodaTime
         /// Gets the time zone in which the local date/time is invalid.
         /// </summary>
         /// <value>The time zone in which the local date/time is invalid</value>
-        public DateTimeZone Zone { get; }
+        [NotNull] public DateTimeZone Zone { get; }
 
         /// <summary>
         /// Creates a new instance for the given local date/time and time zone.

@@ -11,6 +11,18 @@ namespace NodaTime.Test
     public partial class LocalTimeTest
     {
         [Test]
+        public void MinValueEqualToMidnight()
+        {
+            Assert.AreEqual(LocalTime.Midnight, LocalTime.MinValue);
+        }
+
+        [Test]
+        public void MaxValue()
+        {
+            Assert.AreEqual(NodaConstants.NanosecondsPerDay - 1, LocalTime.MaxValue.NanosecondOfDay);
+        }
+
+        [Test]
         public void ClockHourOfHalfDay()
         {
             Assert.AreEqual(12, new LocalTime(0, 0).ClockHourOfHalfDay);
@@ -31,16 +43,10 @@ namespace NodaTime.Test
         }
 
         [Test]
-        public void BinarySerialization()
-        {
-            TestHelper.AssertBinaryRoundtrip(new LocalTime(12, 34, 56, 123, 4567));
-        }
-
-        [Test]
         public void XmlSerialization()
         {
-            var value = new LocalTime(17, 53, 23, 123, 4567);
-            TestHelper.AssertXmlRoundtrip(value, "<value>17:53:23.1234567</value>");
+            var value = LocalTime.FromHourMinuteSecondNanosecond(17, 53, 23, 123456789);
+            TestHelper.AssertXmlRoundtrip(value, "<value>17:53:23.123456789</value>");
         }
 
         [Test]
@@ -48,6 +54,59 @@ namespace NodaTime.Test
         public void XmlSerialization_Invalid(string xml, Type expectedExceptionType)
         {
             TestHelper.AssertXmlInvalid<LocalTime>(xml, expectedExceptionType);
+        }
+
+        [Test]
+        public void Max()
+        {
+            LocalTime x = new LocalTime(5, 10);
+            LocalTime y = new LocalTime(6, 20);
+            Assert.AreEqual(y, LocalTime.Max(x, y));
+            Assert.AreEqual(y, LocalTime.Max(y, x));
+            Assert.AreEqual(x, LocalTime.Max(x, LocalTime.MinValue));
+            Assert.AreEqual(x, LocalTime.Max(LocalTime.MinValue, x));
+            Assert.AreEqual(LocalTime.MaxValue, LocalTime.Max(LocalTime.MaxValue, x));
+            Assert.AreEqual(LocalTime.MaxValue, LocalTime.Max(x, LocalTime.MaxValue));
+        }
+
+        [Test]
+        public void Min()
+        {
+            LocalTime x = new LocalTime(5, 10);
+            LocalTime y = new LocalTime(6, 20);
+            Assert.AreEqual(x, LocalTime.Min(x, y));
+            Assert.AreEqual(x, LocalTime.Min(y, x));
+            Assert.AreEqual(LocalTime.MinValue, LocalTime.Min(x, LocalTime.MinValue));
+            Assert.AreEqual(LocalTime.MinValue, LocalTime.Min(LocalTime.MinValue, x));
+            Assert.AreEqual(x, LocalTime.Min(LocalTime.MaxValue, x));
+            Assert.AreEqual(x, LocalTime.Min(x, LocalTime.MaxValue));
+        }
+
+        [Test]
+        public void Deconstruction()
+        {
+            var value = new LocalTime(15, 8, 20);
+            var expectedHour = 15;
+            var expectedMinute = 8;
+            var expectedSecond = 20;
+
+            var (actualHour, actualMinute, actualSecond) = value;
+
+            Assert.Multiple(() =>
+            {
+                Assert.AreEqual(expectedHour, actualHour);
+                Assert.AreEqual(expectedMinute, actualMinute);
+                Assert.AreEqual(expectedSecond, actualSecond);
+            });
+        }
+
+        [Test]
+        public void WithOffset()
+        {
+            var time = new LocalTime(3, 45, 12, 34);
+            var offset = Offset.FromHours(5);
+            var expected = new OffsetTime(time, offset);
+            Assert.AreEqual(expected, time.WithOffset(offset));
         }
     }
 }

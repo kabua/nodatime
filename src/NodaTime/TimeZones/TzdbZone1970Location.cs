@@ -19,7 +19,6 @@ namespace NodaTime.TimeZones
     /// <see cref="TzdbZoneLocation"/>, except that multiple countries may be represented.
     /// </summary>
     /// <threadsafety>This type is immutable reference type. See the thread safety section of the user guide for more information.</threadsafety>
-    // TODO: Once we've decided whether this approach (two separate classes) is appropriate, work out a better name.
     [Immutable]
     public sealed class TzdbZone1970Location
     {
@@ -107,8 +106,9 @@ namespace NodaTime.TimeZones
             writer.WriteSignedCount(latitudeSeconds);
             writer.WriteSignedCount(longitudeSeconds);
             writer.WriteCount(Countries.Count);
-            // TODO (2.0): Consider writing out the ISO-3166 file as a separate field,
-            // so we can reuse objects. We don't actually waste very much this way, mind you, due to the string pool...
+            // We considered writing out the ISO-3166 file as a separate field,
+            // so we can reuse objects, but we don't actually waste very much space this way, 
+            // due to the string pool... and the increased code complexity isn't worth it.
             foreach (var country in Countries)
             {
                 writer.WriteString(country.Name);
@@ -148,19 +148,20 @@ namespace NodaTime.TimeZones
         /// A country represented within an entry in the "zone1970.tab" file, with the English name
         /// mapped from the "iso3166.tab" file.
         /// </summary>
+        [Immutable]
         public sealed class Country : IEquatable<Country>
         {
             /// <summary>
             /// Gets the English name of the country.
             /// </summary>
             /// <value>The English name of the country.</value>
-            public string Name { get; }
+            [NotNull] public string Name { get; }
 
             /// <summary>
             /// Gets the ISO-3166 2-letter country code for the country.
             /// </summary>
             /// <value>The ISO-3166 2-letter country code for the country.</value>
-            public string Code { get; }
+            [NotNull] public string Code { get; }
 
             /// <summary>
             /// Constructs a new country from its name and ISO-3166 2-letter code.

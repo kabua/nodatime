@@ -2,20 +2,15 @@
 // Use of this source code is governed by the Apache License 2.0,
 // as found in the LICENSE.txt file.
 
-using System;
-using System.Collections.Generic;
 using NodaTime.Globalization;
-using NodaTime.Properties;
 using NodaTime.Text.Patterns;
+using System.Collections.Generic;
 
 namespace NodaTime.Text
 {
     internal sealed class OffsetDateTimePatternParser : IPatternParser<OffsetDateTime>
     {
-        // Split the template value once, to avoid doing it every time we parse.
-        private readonly LocalDate templateValueDate;
-        private readonly LocalTime templateValueTime;
-        private readonly Offset templateValueOffset;
+        private readonly OffsetDateTime templateValue;
 
         private static readonly Dictionary<char, CharacterHandler<OffsetDateTime, OffsetDateTimeParseBucket>> PatternCharacterHandlers =
             new Dictionary<char, CharacterHandler<OffsetDateTime, OffsetDateTimeParseBucket>>
@@ -32,7 +27,7 @@ namespace NodaTime.Text
             { 'M', DatePatternHelper.CreateMonthOfYearHandler<OffsetDateTime, OffsetDateTimeParseBucket>
                         (value => value.Month, (bucket, value) => bucket.Date.MonthOfYearText = value, (bucket, value) => bucket.Date.MonthOfYearNumeric = value) },
             { 'd', DatePatternHelper.CreateDayHandler<OffsetDateTime, OffsetDateTimeParseBucket>
-                        (value => value.Day, value => value.DayOfWeek, (bucket, value) => bucket.Date.DayOfMonth = value, (bucket, value) => bucket.Date.DayOfWeek = value) },
+                        (value => value.Day, value => (int) value.DayOfWeek, (bucket, value) => bucket.Date.DayOfMonth = value, (bucket, value) => bucket.Date.DayOfWeek = value) },
             { '.', TimePatternHelper.CreatePeriodHandler<OffsetDateTime, OffsetDateTimeParseBucket>(9, value => value.NanosecondOfSecond, (bucket, value) => bucket.Time.FractionalSeconds = value) },
             { ';', TimePatternHelper.CreateCommaDotHandler<OffsetDateTime, OffsetDateTimeParseBucket>(9, value => value.NanosecondOfSecond, (bucket, value) => bucket.Time.FractionalSeconds = value) },
             { ':', (pattern, builder) => builder.AddLiteral(builder.FormatInfo.TimeSeparator, ParseResult<OffsetDateTime>.TimeSeparatorMismatch) },
@@ -55,9 +50,7 @@ namespace NodaTime.Text
 
         internal OffsetDateTimePatternParser(OffsetDateTime templateValue)
         {
-            templateValueDate = templateValue.Date;
-            templateValueTime = templateValue.TimeOfDay;
-            templateValueOffset = templateValue.Offset;
+            this.templateValue = templateValue;
         }
 
         // Note: public to implement the interface. It does no harm, and it's simpler than using explicit
@@ -67,7 +60,7 @@ namespace NodaTime.Text
             // Nullity check is performed in OffsetDateTimePattern.
             if (patternText.Length == 0)
             {
-                throw new InvalidPatternException(Messages.Parse_FormatStringEmpty);
+                throw new InvalidPatternException(TextErrorMessages.FormatStringEmpty);
             }
 
             // Handle standard patterns
@@ -82,16 +75,15 @@ namespace NodaTime.Text
                     case 'r':
                         return OffsetDateTimePattern.Patterns.FullRoundtripPatternImpl;
                     default:
-                        throw new InvalidPatternException(Messages.Parse_UnknownStandardFormat, patternText[0], typeof(OffsetDateTime));
+                        throw new InvalidPatternException(TextErrorMessages.UnknownStandardFormat, patternText[0], typeof(OffsetDateTime));
                 }
             }
 
-            var patternBuilder = new SteppedPatternBuilder<OffsetDateTime, OffsetDateTimeParseBucket>(formatInfo,
-                () => new OffsetDateTimeParseBucket(templateValueDate, templateValueTime, templateValueOffset));
+            var patternBuilder = new SteppedPatternBuilder<OffsetDateTime, OffsetDateTimeParseBucket>(formatInfo, () => new OffsetDateTimeParseBucket(templateValue));
             patternBuilder.ParseCustomPattern(patternText, PatternCharacterHandlers);
             patternBuilder.ValidateUsedFields();
             // Need to reconstruct the template value from the bits...
-            return patternBuilder.Build(templateValueDate.At(templateValueTime).WithOffset(templateValueOffset));
+            return patternBuilder.Build(templateValue);
         }
         
         private static void HandleOffset(PatternCursor pattern,
@@ -109,11 +101,11 @@ namespace NodaTime.Text
             internal readonly LocalTimePatternParser.LocalTimeParseBucket Time;
             internal Offset Offset;
 
-            internal OffsetDateTimeParseBucket(LocalDate templateDate, LocalTime templateTime, Offset templateOffset)
+            internal OffsetDateTimeParseBucket(OffsetDateTime templateValue)
             {
-                Date = new LocalDatePatternParser.LocalDateParseBucket(templateDate);
-                Time = new LocalTimePatternParser.LocalTimeParseBucket(templateTime);
-                Offset = templateOffset;
+                Date = new LocalDatePatternParser.LocalDateParseBucket(templateValue.Date);
+                Time = new LocalTimePatternParser.LocalTimeParseBucket(templateValue.TimeOfDay);
+                Offset = templateValue.Offset;
             }
 
             internal override ParseResult<OffsetDateTime> CalculateValue(PatternFields usedFields, string text)

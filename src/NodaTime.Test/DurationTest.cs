@@ -22,12 +22,6 @@ namespace NodaTime.Test
         }
 
         [Test]
-        public void BinarySerialization()
-        {
-            TestHelper.AssertBinaryRoundtrip(Duration.FromTicks(12345L));
-        }
-
-        [Test]
         public void XmlSerialization()
         {
             Duration value = new PeriodBuilder { Days = 5, Hours = 3, Minutes = 20, Seconds = 35, Ticks = 1234500 }.Build().ToDuration();
@@ -225,43 +219,49 @@ namespace NodaTime.Test
         }
 
         [Test]
-        public void Ticks_Zero()
+        public void BclCompatibleTick_Zero()
         {
-            Assert.AreEqual(0, Duration.FromTicks(0).Ticks);
-            Assert.AreEqual(0, Duration.FromNanoseconds(99L).Ticks);
-            Assert.AreEqual(0, Duration.FromNanoseconds(-99L).Ticks);
+            Assert.AreEqual(0, Duration.FromTicks(0).BclCompatibleTicks);
+            Assert.AreEqual(0, Duration.FromNanoseconds(99L).BclCompatibleTicks);
+            Assert.AreEqual(0, Duration.FromNanoseconds(-99L).BclCompatibleTicks);
         }
 
         [Test]
         [TestCase(5L)]
         [TestCase(NodaConstants.TicksPerDay * 2)]
         [TestCase(NodaConstants.TicksPerDay * 365000)]
-        public void Ticks_Positive(long ticks)
+        public void BclCompatibleTick_Positive(long ticks)
         {
             Assert.IsTrue(ticks > 0);
             Duration start = Duration.FromTicks(ticks);
-            Assert.AreEqual(ticks, start.Ticks);
+            Assert.AreEqual(ticks, start.BclCompatibleTicks);
 
             // We truncate towards zero... so subtracting 1 nanosecond should
             // reduce the number of ticks, and adding 99 nanoseconds should not change it
-            Assert.AreEqual(ticks - 1, start.MinusSmallNanoseconds(1L).Ticks);
-            Assert.AreEqual(ticks, start.PlusSmallNanoseconds(99L).Ticks);
+            Assert.AreEqual(ticks - 1, start.MinusSmallNanoseconds(1L).BclCompatibleTicks);
+            Assert.AreEqual(ticks, start.PlusSmallNanoseconds(99L).BclCompatibleTicks);
         }
 
         [Test]
         [TestCase(-5L)]
         [TestCase(-NodaConstants.TicksPerDay * 2)]
         [TestCase(-NodaConstants.TicksPerDay * 365000)]
-        public void Ticks_Negative(long ticks)
+        public void BclCompatibleTicks_Negative(long ticks)
         {
             Assert.IsTrue(ticks < 0);
             Duration start = Duration.FromTicks(ticks);
-            Assert.AreEqual(ticks, start.Ticks);
+            Assert.AreEqual(ticks, start.BclCompatibleTicks);
 
             // We truncate towards zero... so subtracting 99 nanoseconds should
             // have no effect, and adding 1 should increase the number of ticks
-            Assert.AreEqual(ticks, start.MinusSmallNanoseconds(99L).Ticks);
-            Assert.AreEqual(ticks + 1, start.PlusSmallNanoseconds(1L).Ticks);
+            Assert.AreEqual(ticks, start.MinusSmallNanoseconds(99L).BclCompatibleTicks);
+            Assert.AreEqual(ticks + 1, start.PlusSmallNanoseconds(1L).BclCompatibleTicks);
+        }
+
+        [Test]
+        public void BclCompatibleTicks_MinValue()
+        {
+            Assert.Throws<OverflowException>(() => Duration.MinValue.BclCompatibleTicks.ToString());
         }
 
         [Test]
@@ -275,10 +275,10 @@ namespace NodaTime.Test
 
         [Test]
         [Category("Overflow")]
-        public void TicksWithOverflow()
+        public void BclCompatibleTicks_Overflow()
         {
             Duration maxTicks = Duration.FromTicks(long.MaxValue) + Duration.FromTicks(1);
-            Assert.Throws<OverflowException>(() => maxTicks.Ticks.ToString());
+            Assert.Throws<OverflowException>(() => maxTicks.BclCompatibleTicks.ToString());
         }
 
         [Test]
@@ -320,6 +320,9 @@ namespace NodaTime.Test
             Assert.AreEqual(99.0336, duration.TotalHours, 0.0001);
             Assert.AreEqual(5942.0187, duration.TotalMinutes, 0.0001);
             Assert.AreEqual(356521.123456789, duration.TotalSeconds, 0.000000001);
+            Assert.AreEqual(356521123.456789, duration.TotalMilliseconds, 0.000001);
+            Assert.AreEqual(3565211234567.89d, duration.TotalTicks, 0.01);
+            Assert.AreEqual(356521123456789d, duration.TotalNanoseconds, 1);
         }
 
         [Test]
@@ -331,14 +334,42 @@ namespace NodaTime.Test
             Assert.AreEqual(-99.0336, duration.TotalHours, 0.0001);
             Assert.AreEqual(-5942.0187, duration.TotalMinutes, 0.0001);
             Assert.AreEqual(-356521.123456789, duration.TotalSeconds, 0.000000001);
+            Assert.AreEqual(-356521123.456789, duration.TotalMilliseconds, 0.000001);
+            Assert.AreEqual(-356521123456789d, duration.TotalNanoseconds, 1);
         }
-        
+
         [Test]
         public void MaxMinRelationship()
         {
             // Max and Min work like they do for other signed types - basically the max value is one less than the absolute
             // of the min value.
             Assert.AreEqual(Duration.MinValue, -Duration.MaxValue - Duration.Epsilon);
+        }
+
+        [Test]
+        public void Max()
+        {
+            Duration x = Duration.FromNanoseconds(100);
+            Duration y = Duration.FromNanoseconds(200);
+            Assert.AreEqual(y, Duration.Max(x, y));
+            Assert.AreEqual(y, Duration.Max(y, x));
+            Assert.AreEqual(x, Duration.Max(x, Duration.MinValue));
+            Assert.AreEqual(x, Duration.Max(Duration.MinValue, x));
+            Assert.AreEqual(Duration.MaxValue, Duration.Max(Duration.MaxValue, x));
+            Assert.AreEqual(Duration.MaxValue, Duration.Max(x, Duration.MaxValue));
+        }
+
+        [Test]
+        public void Min()
+        {
+            Duration x = Duration.FromNanoseconds(100);
+            Duration y = Duration.FromNanoseconds(200);
+            Assert.AreEqual(x, Duration.Min(x, y));
+            Assert.AreEqual(x, Duration.Min(y, x));
+            Assert.AreEqual(Duration.MinValue, Duration.Min(x, Duration.MinValue));
+            Assert.AreEqual(Duration.MinValue, Duration.Min(Duration.MinValue, x));
+            Assert.AreEqual(x, Duration.Min(Duration.MaxValue, x));
+            Assert.AreEqual(x, Duration.Min(x, Duration.MaxValue));
         }
     }
 }

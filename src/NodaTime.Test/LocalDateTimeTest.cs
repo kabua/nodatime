@@ -4,12 +4,12 @@
 
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using NodaTime.Calendars;
 using NodaTime.Text;
 using NodaTime.TimeZones;
 using NodaTime.Utility;
 using NUnit.Framework;
+using NodaTime.Test.Calendars;
 
 namespace NodaTime.Test
 {
@@ -29,6 +29,26 @@ namespace NodaTime.Test
             Assert.AreEqual(expected, actual);
             // Kind isn't checked by Equals...
             Assert.AreEqual(DateTimeKind.Unspecified, actual.Kind);
+        }
+
+        [Test]
+        [TestCase(100)]
+        [TestCase(1900)]
+        [TestCase(2900)]
+        public void ToDateTimeUnspecified_TruncatesTowardsStartOfTime(int year)
+        {
+            var ldt = new LocalDateTime(year, 1, 1, 13, 15, 55).PlusNanoseconds(NodaConstants.NanosecondsPerSecond - 1);
+            var expected = new DateTime(year, 1, 1, 13, 15, 55, DateTimeKind.Unspecified).AddTicks(NodaConstants.TicksPerSecond - 1);
+            var actual = ldt.ToDateTimeUnspecified();
+            Assert.AreEqual(expected, actual);
+        }
+
+        [Test]
+        public void ToDateTimeUnspecified_OutOfRange()
+        {
+            // One day before 1st January, 1AD (which is DateTime.MinValue)
+            var ldt = new LocalDate(1, 1, 1).PlusDays(-1).AtMidnight();
+            Assert.Throws<InvalidOperationException>(() => ldt.ToDateTimeUnspecified());
         }
 
         [Test]
@@ -60,40 +80,51 @@ namespace NodaTime.Test
         public void TimeProperties_AfterEpoch()
         {
             // Use the largest valid year as part of validating against overflow
-            LocalDateTime ldt = new LocalDateTime(GregorianYearMonthDayCalculator.MaxGregorianYear, 1, 2, 15, 48, 25, 456, 3456);
+            LocalDateTime ldt = new LocalDateTime(GregorianYearMonthDayCalculator.MaxGregorianYear, 1, 2, 15, 48, 25).PlusNanoseconds(123456789);
             Assert.AreEqual(15, ldt.Hour);
             Assert.AreEqual(3, ldt.ClockHourOfHalfDay);
             Assert.AreEqual(48, ldt.Minute);
             Assert.AreEqual(25, ldt.Second);
-            Assert.AreEqual(456, ldt.Millisecond);
-            Assert.AreEqual(4563456, ldt.TickOfSecond);
+            Assert.AreEqual(123, ldt.Millisecond);
+            Assert.AreEqual(1234567, ldt.TickOfSecond);
             Assert.AreEqual(15 * NodaConstants.TicksPerHour + 
                             48 * NodaConstants.TicksPerMinute +
                             25 * NodaConstants.TicksPerSecond +
-                            4563456, ldt.TickOfDay);
+                            1234567, ldt.TickOfDay);
+            Assert.AreEqual(15 * NodaConstants.NanosecondsPerHour +
+                            48 * NodaConstants.NanosecondsPerMinute +
+                            25 * NodaConstants.NanosecondsPerSecond +
+                            123456789, ldt.NanosecondOfDay);
+            Assert.AreEqual(123456789, ldt.NanosecondOfSecond);
         }
 
         [Test]
         public void TimeProperties_BeforeEpoch()
         {
             // Use the smallest valid year number as part of validating against overflow
-            LocalDateTime ldt = new LocalDateTime(GregorianYearMonthDayCalculator.MinGregorianYear, 1, 2, 15, 48, 25, 456, 3456);
+            LocalDateTime ldt = new LocalDateTime(GregorianYearMonthDayCalculator.MinGregorianYear, 1, 2, 15, 48, 25).PlusNanoseconds(123456789);
             Assert.AreEqual(15, ldt.Hour);
             Assert.AreEqual(3, ldt.ClockHourOfHalfDay);
             Assert.AreEqual(48, ldt.Minute);
             Assert.AreEqual(25, ldt.Second);
-            Assert.AreEqual(456, ldt.Millisecond);
-            Assert.AreEqual(4563456, ldt.TickOfSecond);
+            Assert.AreEqual(123, ldt.Millisecond);
+            Assert.AreEqual(1234567, ldt.TickOfSecond);
             Assert.AreEqual(15 * NodaConstants.TicksPerHour +
                             48 * NodaConstants.TicksPerMinute +
                             25 * NodaConstants.TicksPerSecond +
-                            4563456, ldt.TickOfDay);
+                            1234567, ldt.TickOfDay);
+            Assert.AreEqual(15 * NodaConstants.NanosecondsPerHour +
+                            48 * NodaConstants.NanosecondsPerMinute +
+                            25 * NodaConstants.NanosecondsPerSecond +
+                            123456789, ldt.NanosecondOfDay);
+            Assert.AreEqual(123456789, ldt.NanosecondOfSecond);
         }
 
         [Test]
         public void DateTime_Roundtrip_OtherCalendarInBcl()
         {
-            DateTime original = new DateTime(1376, 6, 19, new HijriCalendar());
+            var bcl = BclCalendars.Hijri;
+            DateTime original = bcl.ToDateTime(1376, 6, 19, 0, 0, 0, 0);
             LocalDateTime noda = LocalDateTime.FromDateTime(original);
             // The DateTime only knows about the ISO version...
             Assert.AreNotEqual(1376, noda.Year);
@@ -150,7 +181,7 @@ namespace NodaTime.Test
         }
 
         [Test]
-        public void IsoDayOfWeek_AroundEpoch()
+        public void DayOfWeek_AroundEpoch()
         {
             // Test about couple of months around the Unix epoch. If that works, I'm confident the rest will.
             LocalDateTime dateTime = new LocalDateTime(1969, 12, 1, 0, 0);
@@ -160,7 +191,7 @@ namespace NodaTime.Test
                 for (int hour = 0; hour < 24; hour++)
                 {
                     Assert.AreEqual(BclConversions.ToIsoDayOfWeek(dateTime.ToDateTimeUnspecified().DayOfWeek),
-                        dateTime.IsoDayOfWeek);
+                        dateTime.DayOfWeek);
                     dateTime = dateTime.PlusHours(1);
                 }
             }
@@ -177,38 +208,22 @@ namespace NodaTime.Test
         }
 
         [Test]
-        public void ComparisonOperators_SameCalendar()
+        public void Operators_SameCalendar()
         {
             LocalDateTime value1 = new LocalDateTime(2011, 1, 2, 10, 30, 0);
             LocalDateTime value2 = new LocalDateTime(2011, 1, 2, 10, 30, 0);
             LocalDateTime value3 = new LocalDateTime(2011, 1, 2, 10, 45, 0);
-
-            Assert.IsFalse(value1 < value2);
-            Assert.IsTrue(value1 < value3);
-            Assert.IsFalse(value2 < value1);
-            Assert.IsFalse(value3 < value1);
-
-            Assert.IsTrue(value1 <= value2);
-            Assert.IsTrue(value1 <= value3);
-            Assert.IsTrue(value2 <= value1);
-            Assert.IsFalse(value3 <= value1);
-
-            Assert.IsFalse(value1 > value2);
-            Assert.IsFalse(value1 > value3);
-            Assert.IsFalse(value2 > value1);
-            Assert.IsTrue(value3 > value1);
-
-            Assert.IsTrue(value1 >= value2);
-            Assert.IsFalse(value1 >= value3);
-            Assert.IsTrue(value2 >= value1);
-            Assert.IsTrue(value3 >= value1);
+            TestHelper.TestOperatorComparisonEquality(value1, value2, value3);            
         }
 
         [Test]
-        public void ComparisonOperators_DifferentCalendars_Throws()
+        public void Operators_DifferentCalendars_Throws()
         {
             LocalDateTime value1 = new LocalDateTime(2011, 1, 2, 10, 30);
             LocalDateTime value2 = new LocalDateTime(2011, 1, 3, 10, 30, CalendarSystem.Julian);
+
+            Assert.False(value1 == value2);
+            Assert.True(value1 != value2);
 
             Assert.Throws<ArgumentException>(() => (value1 < value2).ToString());
             Assert.Throws<ArgumentException>(() => (value1 <= value2).ToString());
@@ -393,15 +408,8 @@ namespace NodaTime.Test
         [Test]
         public void XmlSerialization_Iso()
         {
-            var value = new LocalDateTime(2013, 4, 12, 17, 53, 23, 123, 4567);
-            TestHelper.AssertXmlRoundtrip(value, "<value>2013-04-12T17:53:23.1234567</value>");
-        }
-
-        [Test]
-        public void BinarySerialization()
-        {
-            TestHelper.AssertBinaryRoundtrip(new LocalDateTime(2013, 4, 12, 17, 53, 23, CalendarSystem.Julian));
-            TestHelper.AssertBinaryRoundtrip(new LocalDateTime(2013, 4, 12, 17, 53, 23, 123, 4567));
+            var value = new LocalDateTime(2013, 4, 12, 17, 53, 23).PlusNanoseconds(123456789);
+            TestHelper.AssertXmlRoundtrip(value, "<value>2013-04-12T17:53:23.123456789</value>");
         }
 
         [Test]
@@ -417,6 +425,44 @@ namespace NodaTime.Test
         public void XmlSerialization_Invalid(string xml, Type expectedExceptionType)
         {
             TestHelper.AssertXmlInvalid<LocalDateTime>(xml, expectedExceptionType);
+        }
+
+        [Test]
+        public void MinMax_DifferentCalendars_Throws()
+        {
+            LocalDateTime ldt1 = new LocalDateTime(2011, 1, 2, 2, 20);
+            LocalDateTime ldt2 = new LocalDateTime(1500, 1, 1, 5, 10, CalendarSystem.Julian);
+
+            Assert.Throws<ArgumentException>(() => LocalDateTime.Max(ldt1, ldt2));
+            Assert.Throws<ArgumentException>(() => LocalDateTime.Min(ldt1, ldt2));
+        }
+
+        [Test]
+        public void MinMax_SameCalendar()
+        {
+            LocalDateTime ldt1 = new LocalDateTime(1500, 1, 1, 7, 20, CalendarSystem.Julian);
+            LocalDateTime ldt2 = new LocalDateTime(1500, 1, 1, 5, 10, CalendarSystem.Julian);
+
+            Assert.AreEqual(ldt1, LocalDateTime.Max(ldt1, ldt2));
+            Assert.AreEqual(ldt1, LocalDateTime.Max(ldt2, ldt1));
+            Assert.AreEqual(ldt2, LocalDateTime.Min(ldt1, ldt2));
+            Assert.AreEqual(ldt2, LocalDateTime.Min(ldt2, ldt1));
+        }
+
+        [Test]
+        public void Deconstruction()
+        {
+            var value = new LocalDateTime(2017, 10, 15, 21, 30, 0);
+            var expectedDate = new LocalDate(2017, 10, 15);
+            var expectedTime = new LocalTime(21, 30, 0);
+
+            var (actualDate, actualTime) = value;
+
+            Assert.Multiple(() =>
+            {
+                Assert.AreEqual(expectedDate, actualDate);
+                Assert.AreEqual(expectedTime, actualTime);
+            });
         }
     }
 }

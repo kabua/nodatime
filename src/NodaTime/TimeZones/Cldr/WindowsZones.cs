@@ -56,7 +56,7 @@ namespace NodaTime.TimeZones.Cldr
         /// so "7dc0101" for example.
         /// </remarks>
         /// <value>The Windows time zone database version this Windows zone mapping data was created from.</value>
-        public string WindowsVersion { get; }
+        [NotNull] public string WindowsVersion { get; }
 
         /// <summary>
         /// Gets an immutable collection of mappings from Windows system time zones to
@@ -91,6 +91,14 @@ namespace NodaTime.TimeZones.Cldr
         /// to TZDB zone ID. This corresponds to the "001" territory which is present for every zone
         /// within the mapping file.
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Each value in the dictionary is a canonical ID in CLDR, but it may not be canonical
+        /// in TZDB. For example, the ID corresponding to "India Standard Time" is "Asia/Calcutta", which
+        /// is canonical in CLDR but is an alias in TZDB for "Asia/Kolkata". To obtain a canonical TZDB
+        /// ID, use <see cref="TzdbDateTimeZoneSource.CanonicalIdMap"/>.
+        /// </para>
+        /// </remarks>
         /// <value>An immutable dictionary of primary mappings, from Windows system time zone ID
         /// to TZDB zone ID.</value>
         [NotNull] public IDictionary<string, string> PrimaryMapping { get; }
@@ -113,26 +121,6 @@ namespace NodaTime.TimeZones.Cldr
             this.PrimaryMapping = new NodaReadOnlyDictionary<string, string>(
                 mapZones.Where(z => z.Territory == MapZone.PrimaryTerritory)
                         .ToDictionary(z => z.WindowsId, z => z.TzdbIds.Single()));
-        }
-
-        private WindowsZones(string version, NodaReadOnlyDictionary<string, string> primaryMapping)
-        {
-            this.Version = version;
-            this.WindowsVersion = "Unknown";
-            this.TzdbVersion = "Unknown";
-            this.PrimaryMapping = primaryMapping;
-            var mapZoneList = new List<MapZone>(primaryMapping.Count);
-            foreach (var entry in primaryMapping)
-            {
-                mapZoneList.Add(new MapZone(entry.Key, MapZone.PrimaryTerritory, new[] { entry.Value }));
-            }
-            MapZones = new ReadOnlyCollection<MapZone>(mapZoneList);
-        }
-
-        internal static WindowsZones FromPrimaryMapping([NotNull] string version, [NotNull] IDictionary<string, string> mappings)
-        {
-            return new WindowsZones(Preconditions.CheckNotNull(version, nameof(version)),
-                new NodaReadOnlyDictionary<string, string>(Preconditions.CheckNotNull(mappings, nameof(mappings))));
         }
 
         internal static WindowsZones Read(IDateTimeZoneReader reader)

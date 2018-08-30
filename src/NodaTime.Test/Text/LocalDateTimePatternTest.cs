@@ -5,9 +5,9 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using NodaTime.Properties;
 using NodaTime.Text;
 using NUnit.Framework;
+using NodaTime.Test.Calendars;
 
 namespace NodaTime.Test.Text
 {
@@ -33,28 +33,31 @@ namespace NodaTime.Test.Text
         private static readonly LocalDateTime MsdnStandardExampleNoSeconds = new LocalDateTime(2009, 06, 15, 13, 45);
 
         internal static readonly Data[] InvalidPatternData = {
-            new Data { Pattern = "dd MM yyyy HH:MM:SS", Message = Messages.Parse_RepeatedFieldInPattern, Parameters = { 'M' } },
+            new Data { Pattern = "", Message = TextErrorMessages.FormatStringEmpty },
+            new Data { Pattern = "a", Message = TextErrorMessages.UnknownStandardFormat, Parameters = { 'a', typeof(LocalDateTime) } },
+            new Data { Pattern = "dd MM yyyy HH:MM:SS", Message = TextErrorMessages.RepeatedFieldInPattern, Parameters = { 'M' } },
             // Note incorrect use of "u" (year) instead of "y" (year of era)
-            new Data { Pattern = "dd MM uuuu HH:mm:ss gg", Message = Messages.Parse_EraWithoutYearOfEra },
+            new Data { Pattern = "dd MM uuuu HH:mm:ss gg", Message = TextErrorMessages.EraWithoutYearOfEra },
             // Era specifier and calendar specifier in the same pattern.
-            new Data { Pattern = "dd MM yyyy HH:mm:ss gg c", Message = Messages.Parse_CalendarAndEra },
+            new Data { Pattern = "dd MM yyyy HH:mm:ss gg c", Message = TextErrorMessages.CalendarAndEra },
             // Embedded pattern start without ld or lt
-            new Data { Pattern = "yyyy MM dd <", Message = Messages.Parse_UnquotedLiteral, Parameters = { '<' } },
+            new Data { Pattern = "yyyy MM dd <", Message = TextErrorMessages.UnquotedLiteral, Parameters = { '<' } },
             // Attempt to use a full embedded date/time pattern (not valid for LocalDateTime)
-            new Data { Pattern = "l<yyyy MM dd HH:mm>", Message = Messages.Parse_InvalidEmbeddedPatternType },
+            new Data { Pattern = "l<yyyy MM dd HH:mm>", Message = TextErrorMessages.InvalidEmbeddedPatternType },
             // Invalid nested pattern (local date pattern doesn't know about embedded patterns)
-            new Data { Pattern = "ld<<D>>", Message = Messages.Parse_UnquotedLiteral, Parameters = { '<' } },
+            new Data { Pattern = "ld<<D>>", Message = TextErrorMessages.UnquotedLiteral, Parameters = { '<' } },
         };
 
         internal static Data[] ParseFailureData = {
-            new Data { Pattern = "dd MM yyyy HH:mm:ss", Text = "Complete mismatch", Message = Messages.Parse_MismatchedNumber, Parameters = { "dd" }},
-            new Data { Pattern = "(c)", Text = "(xxx)", Message = Messages.Parse_NoMatchingCalendarSystem },
+            new Data { Pattern = "dd MM yyyy HH:mm:ss", Text = "Complete mismatch", Message = TextErrorMessages.MismatchedNumber, Parameters = { "dd" }},
+            new Data { Pattern = "(c)", Text = "(xxx)", Message = TextErrorMessages.NoMatchingCalendarSystem },
             // 24 as an hour is only valid when the time is midnight
-            new Data { Pattern = "yyyy-MM-dd HH:mm:ss", Text = "2011-10-19 24:00:05", Message = Messages.Parse_InvalidHour24 },
-            new Data { Pattern = "yyyy-MM-dd HH:mm:ss", Text = "2011-10-19 24:01:00", Message = Messages.Parse_InvalidHour24 },
-            new Data { Pattern = "yyyy-MM-dd HH:mm", Text = "2011-10-19 24:01", Message = Messages.Parse_InvalidHour24 },
-            new Data { Pattern = "yyyy-MM-dd HH:mm", Text = "2011-10-19 24:00", Template = new LocalDateTime(1970, 1, 1, 0, 0, 5), Message = Messages.Parse_InvalidHour24},
-            new Data { Pattern = "yyyy-MM-dd HH", Text = "2011-10-19 24", Template = new LocalDateTime(1970, 1, 1, 0, 5, 0), Message = Messages.Parse_InvalidHour24},
+            new Data { Pattern = "yyyy-MM-dd", Text = "2017-02-30", Message = TextErrorMessages.DayOfMonthOutOfRange, Parameters = { 30, 2, 2017 } },
+            new Data { Pattern = "yyyy-MM-dd HH:mm:ss", Text = "2011-10-19 24:00:05", Message = TextErrorMessages.InvalidHour24 },
+            new Data { Pattern = "yyyy-MM-dd HH:mm:ss", Text = "2011-10-19 24:01:00", Message = TextErrorMessages.InvalidHour24 },
+            new Data { Pattern = "yyyy-MM-dd HH:mm", Text = "2011-10-19 24:01", Message = TextErrorMessages.InvalidHour24 },
+            new Data { Pattern = "yyyy-MM-dd HH:mm", Text = "2011-10-19 24:00", Template = new LocalDateTime(1970, 1, 1, 0, 0, 5), Message = TextErrorMessages.InvalidHour24},
+            new Data { Pattern = "yyyy-MM-dd HH", Text = "2011-10-19 24", Template = new LocalDateTime(1970, 1, 1, 0, 5, 0), Message = TextErrorMessages.InvalidHour24},
         };
 
         internal static Data[] ParseOnlyData = {
@@ -73,6 +76,9 @@ namespace NodaTime.Test.Text
 
         internal static Data[] FormatOnlyData = {
             new Data(2011, 10, 19, 16, 05, 20) { Pattern = "ddd yyyy", Text = "Wed 2011" },
+            // Note trunction of the "89" nanoseconds; o and O are BCL roundtrip patterns, with tick precision.
+            new Data(SampleLocalDateTime) { Pattern = "o", Text = "1976-06-19T21:13:34.1234567" },
+            new Data(SampleLocalDateTime) { Pattern = "O", Text = "1976-06-19T21:13:34.1234567" }
         };
 
         internal static Data[] FormatAndParseData = {
@@ -100,10 +106,13 @@ namespace NodaTime.Test.Text
             new Data(MsdnStandardExampleNoSeconds) { Pattern = "g", Text = "15/06/2009 13:45", Culture = Cultures.FrFr },
             new Data(MsdnStandardExampleNoMillis) { Pattern = "G", Text = "15/06/2009 13:45:30", Culture = Cultures.FrFr },
             // Culture has no impact on round-trip or sortable formats
-            new Data(MsdnStandardExample) { Pattern = "o", Text = "2009-06-15T13:45:30.0900000", Culture = Cultures.FrFr },
-            new Data(MsdnStandardExample) { Pattern = "O", Text = "2009-06-15T13:45:30.0900000", Culture = Cultures.FrFr },
-            new Data(MsdnStandardExample) { Pattern = "r", Text = "2009-06-15T13:45:30.090000000 (ISO)", Culture = Cultures.FrFr },
-            new Data(MsdnStandardExampleNoMillis) { Pattern = "s", Text = "2009-06-15T13:45:30", Culture = Cultures.FrFr },
+            new Data(MsdnStandardExample) { StandardPattern = LocalDateTimePattern.BclRoundtrip, Pattern = "o", Text = "2009-06-15T13:45:30.0900000", Culture = Cultures.FrFr },
+            new Data(MsdnStandardExample) { StandardPattern = LocalDateTimePattern.BclRoundtrip, Pattern = "O", Text = "2009-06-15T13:45:30.0900000", Culture = Cultures.FrFr },
+            new Data(MsdnStandardExample) { StandardPattern = LocalDateTimePattern.FullRoundtripWithoutCalendar, Pattern = "R", Text = "2009-06-15T13:45:30.090000000", Culture = Cultures.FrFr },
+            new Data(MsdnStandardExample) { StandardPattern = LocalDateTimePattern.FullRoundtrip, Pattern = "r", Text = "2009-06-15T13:45:30.090000000 (ISO)", Culture = Cultures.FrFr },
+            new Data(MsdnStandardExampleNoMillis) { StandardPattern = LocalDateTimePattern.GeneralIso, Pattern = "s", Text = "2009-06-15T13:45:30", Culture = Cultures.FrFr },
+            new Data(SampleLocalDateTime) { StandardPattern = LocalDateTimePattern.FullRoundtripWithoutCalendar, Pattern = "R", Text = "1976-06-19T21:13:34.123456789", Culture = Cultures.FrFr },
+            new Data(SampleLocalDateTime) { StandardPattern = LocalDateTimePattern.FullRoundtrip, Pattern = "r", Text = "1976-06-19T21:13:34.123456789 (ISO)", Culture = Cultures.FrFr },
 
             // Calendar patterns are invariant
             new Data(MsdnStandardExample) { Pattern = "(c) uuuu-MM-dd'T'HH:mm:ss.FFFFFFFFF", Text = "(ISO) 2009-06-15T13:45:30.09", Culture = Cultures.FrFr },
@@ -111,6 +120,9 @@ namespace NodaTime.Test.Text
             new Data(SampleLocalDateTimeCoptic) { Pattern = "(c) uuuu-MM-dd'T'HH:mm:ss.FFFFFFFFF", Text = "(Coptic) 1976-06-19T21:13:34.123456789", Culture = Cultures.FrFr },
             new Data(SampleLocalDateTimeCoptic) { Pattern = "uuuu-MM-dd'C'c'T'HH:mm:ss.FFFFFFFFF", Text = "1976-06-19CCopticT21:13:34.123456789", Culture = Cultures.EnUs },
             
+            // Standard invariant patterns with a property but no pattern character
+            new Data(MsdnStandardExample) { StandardPattern = LocalDateTimePattern.ExtendedIso, Pattern = "uuuu'-'MM'-'dd'T'HH':'mm':'ss;FFFFFFFFF", Text = "2009-06-15T13:45:30.09", Culture = Cultures.FrFr },            
+
             // Use of the semi-colon "comma dot" specifier
             new Data(2011, 10, 19, 16, 05, 20, 352) { Pattern = "yyyy-MM-dd HH:mm:ss;fff", Text = "2011-10-19 16:05:20.352" },
             new Data(2011, 10, 19, 16, 05, 20, 352) { Pattern = "yyyy-MM-dd HH:mm:ss;FFF", Text = "2011-10-19 16:05:20.352" },
@@ -143,6 +155,33 @@ namespace NodaTime.Test.Text
         internal static IEnumerable<Data> FormatData = FormatOnlyData.Concat(FormatAndParseData);
 
         [Test]
+        public void WithCalendar()
+        {
+            var pattern = LocalDateTimePattern.GeneralIso.WithCalendar(CalendarSystem.Coptic);
+            var value = pattern.Parse("0284-08-29T12:34:56").Value;
+            Assert.AreEqual(new LocalDateTime(284, 8, 29, 12, 34, 56, CalendarSystem.Coptic), value);
+        }
+
+        [Test]
+        public void CreateWithCurrentCulture()
+        {
+            var dateTime = new LocalDateTime(2017, 8, 23, 12, 34, 56);
+            using (CultureSaver.SetCultures(Cultures.FrFr))
+            {
+                var pattern = LocalDateTimePattern.CreateWithCurrentCulture("g");
+                Assert.AreEqual("23/08/2017 12:34", pattern.Format(dateTime));
+            }
+            using (CultureSaver.SetCultures(Cultures.FrCa))
+            {
+                var pattern = LocalDateTimePattern.CreateWithCurrentCulture("g");
+                Assert.AreEqual("2017-08-23 12:34", pattern.Format(dateTime));
+            }
+        }
+
+        [Test]
+        public void ParseNull() => AssertParseNull(LocalDateTimePattern.ExtendedIso);
+
+        [Test]
         [TestCaseSource(nameof(AllCulturesStandardPatterns))]
         public void BclStandardPatternComparison(CultureInfo culture, string pattern)
         {
@@ -154,7 +193,7 @@ namespace NodaTime.Test.Text
         public void ParseFormattedStandardPattern(CultureInfo culture, string patternText)
         {
             var pattern = CreatePatternOrNull(patternText, culture, new LocalDateTime(2000, 1, 1, 0, 0));
-            if (pattern == null)
+            if (pattern is null)
             {
                 return;
             }
@@ -198,7 +237,7 @@ namespace NodaTime.Test.Text
             }
 
             var pattern = CreatePatternOrNull(patternText, culture, LocalDateTimePattern.DefaultTemplateValue);
-            if (pattern == null)
+            if (pattern is null)
             {
                 return;
             }
@@ -216,19 +255,11 @@ namespace NodaTime.Test.Text
             // Formatting a DateTime with an always-invariant pattern (round-trip, sortable) converts to the ISO
             // calendar in .NET (which is reasonable, as there's no associated calendar).
             // We should use the Gregorian calendar for those tests.
-            // However, on Mono (at least some versions) the round-trip format (o and O) is broken - it uses
-            // the calendar of the culture instead of the ISO-8601 calendar. So for those cultures,
-            // we'll skip round-trip format tests.
-            // See https://bugzilla.xamarin.com/show_bug.cgi?id=11364
             bool alwaysInvariantPattern = "Oos".Contains(patternText);
-            if (alwaysInvariantPattern && TestHelper.IsRunningOnMono && !(culture.Calendar is GregorianCalendar))
-            {
-                return;
-            }
             Calendar calendar = alwaysInvariantPattern ? CultureInfo.InvariantCulture.Calendar : culture.Calendar;
 
-            var calendarSystem = CalendarSystemForCalendar(calendar);
-            if (calendarSystem == null)
+            var calendarSystem = BclCalendars.CalendarSystemForCalendar(calendar);
+            if (calendarSystem is null)
             {
                 // We can't map this calendar system correctly yet; the test would be invalid.
                 return;

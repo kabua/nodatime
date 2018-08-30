@@ -2,7 +2,7 @@
 // Use of this source code is governed by the Apache License 2.0,
 // as found in the LICENSE.txt file.
 
-#if !V1_0 && !V1_1
+#if SERIALIZATION_RELEASED && !V1_0 && !V1_1
 
 using BenchmarkDotNet.Attributes;
 using Newtonsoft.Json;
@@ -10,14 +10,13 @@ using NodaTime.Serialization.JsonNet;
 
 namespace NodaTime.Benchmarks.NodaTimeTests.JsonNet
 {
-    [Config(typeof(BenchmarkConfig))]
     public class FormattingBenchmarks
     {
         private static readonly JsonSerializerSettings settings = new JsonSerializerSettings().ConfigureForNodaTime(DateTimeZoneProviders.Tzdb);
 
         private static readonly Instant sampleInstant = Instant.FromUtc(2012, 1, 2, 3, 4, 5);
         private static readonly DateTimeZone sampleDateTimeZone = DateTimeZoneProviders.Tzdb["Europe/London"];
-        private static readonly LocalDateTime sampleLocalDateTime = new LocalDateTime(2013, 12, 11, 8, 31, 20, 123, 4567);
+        private static readonly LocalDateTime sampleLocalDateTime = new LocalDateTime(2013, 12, 11, 8, 31, 20).PlusNanoseconds(123456789);
         private static readonly LocalDate sampleLocalDate = sampleLocalDateTime.Date;
         private static readonly LocalTime sampleLocalTime = sampleLocalDateTime.TimeOfDay;
         private static readonly Offset sampleOffset = Offset.FromHoursAndMinutes(5, 30);

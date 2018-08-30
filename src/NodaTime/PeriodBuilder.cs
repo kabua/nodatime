@@ -178,7 +178,7 @@ namespace NodaTime
         /// Builds a period from the properties in this builder.
         /// </summary>
         /// <returns>A period containing the values from this builder.</returns>
-        public Period Build() =>
+        [NotNull] public Period Build() =>
             new Period(Years, Months, Weeks, Days, Hours, Minutes, Seconds, Milliseconds, Ticks, Nanoseconds);
 
         /// <inheritdoc />
@@ -188,7 +188,7 @@ namespace NodaTime
         void IXmlSerializable.ReadXml(XmlReader reader)
         {
             string text = reader.ReadElementContentAsString();
-            Period period = PeriodPattern.RoundtripPattern.Parse(text).Value;
+            Period period = PeriodPattern.Roundtrip.Parse(text).Value;
             Years = period.Years;
             Months = period.Months;
             Weeks = period.Weeks;
@@ -204,7 +204,7 @@ namespace NodaTime
         /// <inheritdoc />
         void IXmlSerializable.WriteXml(XmlWriter writer)
         {
-            writer.WriteString(PeriodPattern.RoundtripPattern.Format(Build()));
+            writer.WriteString(PeriodPattern.Roundtrip.Format(Build()));
         }
     }
 }

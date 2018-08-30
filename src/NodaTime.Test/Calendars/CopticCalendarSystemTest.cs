@@ -4,6 +4,7 @@
 
 using NodaTime.Calendars;
 using NUnit.Framework;
+using System;
 
 namespace NodaTime.Test.Calendars
 {
@@ -50,7 +51,7 @@ namespace NodaTime.Test.Calendars
             Assert.AreEqual(10, coptic.Month);
             Assert.AreEqual(2, coptic.Day);
             
-            Assert.AreEqual(IsoDayOfWeek.Wednesday, coptic.IsoDayOfWeek);
+            Assert.AreEqual(IsoDayOfWeek.Wednesday, coptic.DayOfWeek);
 
             Assert.AreEqual(9 * 30 + 2, coptic.DayOfYear);
 
@@ -58,6 +59,14 @@ namespace NodaTime.Test.Calendars
             Assert.AreEqual(0, coptic.Minute);
             Assert.AreEqual(0, coptic.Second);
             Assert.AreEqual(0, coptic.Millisecond);
+        }
+
+        // Really testing SingleEraCalculator...
+        [Test]
+        public void InvalidEra()
+        {
+            Assert.Throws<ArgumentNullException>(() => CalendarSystem.Coptic.GetAbsoluteYear(1720, null));
+            Assert.Throws<ArgumentException>(() => CalendarSystem.Coptic.GetAbsoluteYear(1720, Era.AnnoHegirae));
         }
     }
 }

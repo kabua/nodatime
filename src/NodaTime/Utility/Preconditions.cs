@@ -20,7 +20,7 @@ namespace NodaTime.Utility
         [ContractAnnotation("argument:null => halt")]
         internal static T CheckNotNull<T>(T argument, [InvokerParameterName] string paramName) where T : class
         {
-            if (argument == null)
+            if (argument is null)
             {
                 throw new ArgumentNullException(paramName);
             }
@@ -36,39 +36,11 @@ namespace NodaTime.Utility
         internal static void DebugCheckNotNull<T>(T argument, [InvokerParameterName] string paramName) where T : class
         {
 #if DEBUG
-            if (argument == null)
+            if (argument is null)
             {
                 throw new DebugPreconditionException($"{paramName} is null");
             }
 #endif
-        }
-
-        internal static void CheckArgumentRange([InvokerParameterName] string paramName, long value, long minInclusive, long maxInclusive)
-        {
-            if (value < minInclusive || value > maxInclusive)
-            {
-#if PCL
-                throw new ArgumentOutOfRangeException(paramName,
-                    $"Value should be in range [{minInclusive}-{maxInclusive}]");
-#else
-                throw new ArgumentOutOfRangeException(paramName, value,
-                    $"Value should be in range [{minInclusive}-{maxInclusive}]");
-#endif
-            }
-        }
-
-        internal static void CheckArgumentRange([InvokerParameterName] string paramName, double value, double minInclusive, double maxInclusive)
-        {
-            if (value < minInclusive || value > maxInclusive || double.IsNaN(value))
-            {
-#if PCL
-                throw new ArgumentOutOfRangeException(paramName,
-                    $"Value should be in range [{minInclusive}-{maxInclusive}]");
-#else
-                throw new ArgumentOutOfRangeException(paramName, value,
-                    $"Value should be in range [{minInclusive}-{maxInclusive}]");
-#endif
-            }
         }
 
         // Note: this overload exists for performance reasons. It would be reasonable to call the
@@ -78,14 +50,30 @@ namespace NodaTime.Utility
         {
             if (value < minInclusive || value > maxInclusive)
             {
-#if PCL
-                throw new ArgumentOutOfRangeException(paramName,
-                    $"Value should be in range [{minInclusive}-{maxInclusive}]");
-#else
-                throw new ArgumentOutOfRangeException(paramName, value,
-                    $"Value should be in range [{minInclusive}-{maxInclusive}]");
-#endif
+                ThrowArgumentOutOfRangeException(paramName, value, minInclusive, maxInclusive);
             }
+        }
+
+        internal static void CheckArgumentRange([InvokerParameterName] string paramName, long value, long minInclusive, long maxInclusive)
+        {
+            if (value < minInclusive || value > maxInclusive)
+            {
+                ThrowArgumentOutOfRangeException(paramName, value, minInclusive, maxInclusive);
+            }
+        }
+
+        internal static void CheckArgumentRange([InvokerParameterName] string paramName, double value, double minInclusive, double maxInclusive)
+        {
+            if (value < minInclusive || value > maxInclusive || double.IsNaN(value))
+            {
+                ThrowArgumentOutOfRangeException(paramName, value, minInclusive, maxInclusive);
+            }
+        }
+
+        private static void ThrowArgumentOutOfRangeException<T>([InvokerParameterName] string paramName, T value, T minInclusive, T maxInclusive)
+        {
+            throw new ArgumentOutOfRangeException(paramName, value,
+                $"Value should be in range [{minInclusive}-{maxInclusive}]");
         }
 
         /// <summary>
@@ -111,7 +99,7 @@ namespace NodaTime.Utility
         /// </summary>
         [Conditional("DEBUG")]
         internal static void DebugCheckArgumentRange([InvokerParameterName] string paramName, long value, long minInclusive, long maxInclusive)
-        {            
+        {
 #if DEBUG
             if (value < minInclusive || value > maxInclusive)
             {
@@ -124,11 +112,13 @@ namespace NodaTime.Utility
         [Conditional("DEBUG")]
         internal static void DebugCheckArgument(bool expression, [InvokerParameterName] string parameter, string messageFormat, params object[] messageArgs)
         {
+#if DEBUG
             if (!expression)
             {
                 string message = string.Format(messageFormat, messageArgs);
-                throw new ArgumentException(message, parameter);
+                throw new DebugPreconditionException($"{message} (parameter name: {parameter})");
             }
+#endif
         }
 
         [ContractAnnotation("expression:false => halt")]
@@ -162,23 +152,24 @@ namespace NodaTime.Utility
             }
         }
 
-        [ContractAnnotation("expression:false => halt")]
-        [StringFormatMethod("messageFormat")]
-        internal static void CheckArgument(bool expression, string parameter, string messageFormat, params object[] messageArgs)
-        {
-            if (!expression)
-            {
-                string message = string.Format(messageFormat, messageArgs);
-                throw new ArgumentException(message, parameter);
-            }
-        }
-
         internal static void CheckState(bool expression, string message)
         {
             if (!expression)
             {
                 throw new InvalidOperationException(message);
             }
+        }
+
+        [ContractAnnotation("expression:false => halt")]
+        [Conditional("DEBUG")]
+        internal static void DebugCheckState(bool expression, string message)
+        {
+#if DEBUG
+            if (!expression)
+            {
+                throw new DebugPreconditionException(message);
+            }
+#endif
         }
     }
 
@@ -193,7 +184,7 @@ namespace NodaTime.Utility
     /// </summary>
     internal class DebugPreconditionException : Exception
     {
-        internal DebugPreconditionException(string message)
+        internal DebugPreconditionException(string message) : base(message)
         {
         }
     }

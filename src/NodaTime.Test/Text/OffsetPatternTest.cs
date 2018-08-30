@@ -4,7 +4,6 @@
 
 using System.Collections.Generic;
 using System.Linq;
-using NodaTime.Properties;
 using NodaTime.Text;
 using NUnit.Framework;
 using System.Globalization;
@@ -71,55 +70,55 @@ namespace NodaTime.Test.Text
         /// Test data for invalid patterns
         /// </summary>
         internal static readonly Data[] InvalidPatternData = {
-            new Data(Offset.Zero) { Pattern = "", Message = Messages.Parse_FormatStringEmpty },
-            new Data(Offset.Zero) { Pattern = "%Z", Message = Messages.Parse_EmptyZPrefixedOffsetPattern },
-            new Data(Offset.Zero) { Pattern = "HH:mmZ", Message = Messages.Parse_ZPrefixNotAtStartOfPattern },
-            new Data(Offset.Zero) { Pattern = "%%H", Message = Messages.Parse_PercentDoubled},
-            new Data(Offset.Zero) { Pattern = "HH:HH", Message = Messages.Parse_RepeatedFieldInPattern, Parameters = {'H'} },
-            new Data(Offset.Zero) { Pattern = "mm:mm", Message = Messages.Parse_RepeatedFieldInPattern, Parameters = {'m'} },
-            new Data(Offset.Zero) { Pattern = "ss:ss", Message = Messages.Parse_RepeatedFieldInPattern, Parameters = {'s'} },
-            new Data(Offset.Zero) { Pattern = "+HH:-mm", Message = Messages.Parse_RepeatedFieldInPattern, Parameters = {'-'} },
-            new Data(Offset.Zero) { Pattern = "-HH:+mm", Message = Messages.Parse_RepeatedFieldInPattern, Parameters = {'+'} },
-            new Data(Offset.Zero) { Pattern = "!", Message = Messages.Parse_UnknownStandardFormat, Parameters = {'!', typeof(Offset).FullName}},
-            new Data(Offset.Zero) { Pattern = "%", Message = Messages.Parse_UnknownStandardFormat, Parameters = { '%', typeof(Offset).FullName } },
-            new Data(Offset.Zero) { Pattern = "%%", Message = Messages.Parse_PercentDoubled },
-            new Data(Offset.Zero) { Pattern = "%\\", Message = Messages.Parse_EscapeAtEndOfString },
-            new Data(Offset.Zero) { Pattern = "\\", Message = Messages.Parse_UnknownStandardFormat, Parameters = { '\\', typeof(Offset).FullName } },
-            new Data(Offset.Zero) { Pattern = "H%", Message = Messages.Parse_PercentAtEndOfString },
-            new Data(Offset.Zero) { Pattern = "hh", Message = Messages.Parse_Hour12PatternNotSupported, Parameters = { typeof(Offset).FullName } },
-            new Data(Offset.Zero) { Pattern = "HHH", Message = Messages.Parse_RepeatCountExceeded, Parameters = { 'H', 2 } },
-            new Data(Offset.Zero) { Pattern = "mmm", Message = Messages.Parse_RepeatCountExceeded, Parameters = { 'm', 2 } },
-            new Data(Offset.Zero) { Pattern = "mmmmmmmmmmmmmmmmmmm", Message = Messages.Parse_RepeatCountExceeded, Parameters = { 'm', 2 } },
-            new Data(Offset.Zero) { Pattern = "'qwe", Message = Messages.Parse_MissingEndQuote, Parameters = { '\'' } },
-            new Data(Offset.Zero) { Pattern = "'qwe\\", Message = Messages.Parse_EscapeAtEndOfString },
-            new Data(Offset.Zero) { Pattern = "'qwe\\'", Message = Messages.Parse_MissingEndQuote, Parameters = { '\'' } },
-            new Data(Offset.Zero) { Pattern = "sss", Message = Messages.Parse_RepeatCountExceeded, Parameters = { 's', 2 } },
+            new Data(Offset.Zero) { Pattern = "", Message = TextErrorMessages.FormatStringEmpty },
+            new Data(Offset.Zero) { Pattern = "%Z", Message = TextErrorMessages.EmptyZPrefixedOffsetPattern },
+            new Data(Offset.Zero) { Pattern = "HH:mmZ", Message = TextErrorMessages.ZPrefixNotAtStartOfPattern },
+            new Data(Offset.Zero) { Pattern = "%%H", Message = TextErrorMessages.PercentDoubled},
+            new Data(Offset.Zero) { Pattern = "HH:HH", Message = TextErrorMessages.RepeatedFieldInPattern, Parameters = {'H'} },
+            new Data(Offset.Zero) { Pattern = "mm:mm", Message = TextErrorMessages.RepeatedFieldInPattern, Parameters = {'m'} },
+            new Data(Offset.Zero) { Pattern = "ss:ss", Message = TextErrorMessages.RepeatedFieldInPattern, Parameters = {'s'} },
+            new Data(Offset.Zero) { Pattern = "+HH:-mm", Message = TextErrorMessages.RepeatedFieldInPattern, Parameters = {'-'} },
+            new Data(Offset.Zero) { Pattern = "-HH:+mm", Message = TextErrorMessages.RepeatedFieldInPattern, Parameters = {'+'} },
+            new Data(Offset.Zero) { Pattern = "!", Message = TextErrorMessages.UnknownStandardFormat, Parameters = {'!', typeof(Offset).FullName}},
+            new Data(Offset.Zero) { Pattern = "%", Message = TextErrorMessages.UnknownStandardFormat, Parameters = { '%', typeof(Offset).FullName } },
+            new Data(Offset.Zero) { Pattern = "%%", Message = TextErrorMessages.PercentDoubled },
+            new Data(Offset.Zero) { Pattern = "%\\", Message = TextErrorMessages.EscapeAtEndOfString },
+            new Data(Offset.Zero) { Pattern = "\\", Message = TextErrorMessages.UnknownStandardFormat, Parameters = { '\\', typeof(Offset).FullName } },
+            new Data(Offset.Zero) { Pattern = "H%", Message = TextErrorMessages.PercentAtEndOfString },
+            new Data(Offset.Zero) { Pattern = "hh", Message = TextErrorMessages.Hour12PatternNotSupported, Parameters = { typeof(Offset).FullName } },
+            new Data(Offset.Zero) { Pattern = "HHH", Message = TextErrorMessages.RepeatCountExceeded, Parameters = { 'H', 2 } },
+            new Data(Offset.Zero) { Pattern = "mmm", Message = TextErrorMessages.RepeatCountExceeded, Parameters = { 'm', 2 } },
+            new Data(Offset.Zero) { Pattern = "mmmmmmmmmmmmmmmmmmm", Message = TextErrorMessages.RepeatCountExceeded, Parameters = { 'm', 2 } },
+            new Data(Offset.Zero) { Pattern = "'qwe", Message = TextErrorMessages.MissingEndQuote, Parameters = { '\'' } },
+            new Data(Offset.Zero) { Pattern = "'qwe\\", Message = TextErrorMessages.EscapeAtEndOfString },
+            new Data(Offset.Zero) { Pattern = "'qwe\\'", Message = TextErrorMessages.MissingEndQuote, Parameters = { '\'' } },
+            new Data(Offset.Zero) { Pattern = "sss", Message = TextErrorMessages.RepeatCountExceeded, Parameters = { 's', 2 } },
         };
 
         /// <summary>
         /// Tests for parsing failures (of values)
         /// </summary>
         internal static readonly Data[] ParseFailureData = {
-            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "", Pattern = "g", Message = Messages.Parse_ValueStringEmpty },
-            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "1", Pattern = "HH", Message = Messages.Parse_MismatchedNumber, Parameters = {"HH"} },
-            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "1", Pattern = "mm", Message = Messages.Parse_MismatchedNumber, Parameters = {"mm"} },
-            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "1", Pattern = "ss", Message = Messages.Parse_MismatchedNumber, Parameters = {"ss"} },
-            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "12:34 ", Pattern = "HH:mm", Message = Messages.Parse_ExtraValueCharacters, Parameters = {" "} },
-            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "1a", Pattern = "H ", Message = Messages.Parse_MismatchedCharacter, Parameters = {' '}},
-            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "2:", Pattern = "%H", Message = Messages.Parse_ExtraValueCharacters, Parameters = {":"}},
-            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "a", Pattern = "%.", Message = Messages.Parse_MismatchedCharacter, Parameters = {'.'}},
-            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "a", Pattern = "%:", Message = Messages.Parse_TimeSeparatorMismatch},
-            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "a", Pattern = "%H", Message = Messages.Parse_MismatchedNumber, Parameters = {"H"} },
-            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "a", Pattern = "%m", Message = Messages.Parse_MismatchedNumber, Parameters = {"m"} },
-            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "a", Pattern = "%s", Message = Messages.Parse_MismatchedNumber, Parameters = {"s"} },
-            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "a", Pattern = ".H", Message = Messages.Parse_MismatchedCharacter, Parameters = {'.'}},
-            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "a", Pattern = "\\'", Message = Messages.Parse_EscapedCharacterMismatch, Parameters = {'\''} },
-            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "axc", Pattern = "'abc'", Message = Messages.Parse_QuotedStringMismatch},
-            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "z", Pattern = "%*", Message = Messages.Parse_MismatchedCharacter, Parameters = {'*'} },
-            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "24", Pattern = "HH", Message = Messages.Parse_FieldValueOutOfRange, Parameters = {24, 'H', typeof(Offset) }},
-            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "60", Pattern = "mm", Message = Messages.Parse_FieldValueOutOfRange, Parameters = {60, 'm', typeof(Offset) }},
-            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "60", Pattern = "ss", Message = Messages.Parse_FieldValueOutOfRange, Parameters = {60, 's', typeof(Offset) }},
-            new Data(Offset.Zero) { Text = "+12", Pattern = "-HH", Message = Messages.Parse_PositiveSignInvalid },
+            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "", Pattern = "g", Message = TextErrorMessages.ValueStringEmpty },
+            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "1", Pattern = "HH", Message = TextErrorMessages.MismatchedNumber, Parameters = {"HH"} },
+            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "1", Pattern = "mm", Message = TextErrorMessages.MismatchedNumber, Parameters = {"mm"} },
+            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "1", Pattern = "ss", Message = TextErrorMessages.MismatchedNumber, Parameters = {"ss"} },
+            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "12:34 ", Pattern = "HH:mm", Message = TextErrorMessages.ExtraValueCharacters, Parameters = {" "} },
+            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "1a", Pattern = "H ", Message = TextErrorMessages.MismatchedCharacter, Parameters = {' '}},
+            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "2:", Pattern = "%H", Message = TextErrorMessages.ExtraValueCharacters, Parameters = {":"}},
+            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "a", Pattern = "%.", Message = TextErrorMessages.MismatchedCharacter, Parameters = {'.'}},
+            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "a", Pattern = "%:", Message = TextErrorMessages.TimeSeparatorMismatch},
+            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "a", Pattern = "%H", Message = TextErrorMessages.MismatchedNumber, Parameters = {"H"} },
+            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "a", Pattern = "%m", Message = TextErrorMessages.MismatchedNumber, Parameters = {"m"} },
+            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "a", Pattern = "%s", Message = TextErrorMessages.MismatchedNumber, Parameters = {"s"} },
+            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "a", Pattern = ".H", Message = TextErrorMessages.MismatchedCharacter, Parameters = {'.'}},
+            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "a", Pattern = "\\'", Message = TextErrorMessages.EscapedCharacterMismatch, Parameters = {'\''} },
+            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "axc", Pattern = "'abc'", Message = TextErrorMessages.QuotedStringMismatch},
+            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "z", Pattern = "%*", Message = TextErrorMessages.MismatchedCharacter, Parameters = {'*'} },
+            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "24", Pattern = "HH", Message = TextErrorMessages.FieldValueOutOfRange, Parameters = {24, 'H', typeof(Offset) }},
+            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "60", Pattern = "mm", Message = TextErrorMessages.FieldValueOutOfRange, Parameters = {60, 'm', typeof(Offset) }},
+            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "60", Pattern = "ss", Message = TextErrorMessages.FieldValueOutOfRange, Parameters = {60, 's', typeof(Offset) }},
+            new Data(Offset.Zero) { Text = "+12", Pattern = "-HH", Message = TextErrorMessages.PositiveSignInvalid },
         };
 
         /// <summary>
@@ -129,8 +128,8 @@ namespace NodaTime.Test.Text
         internal static readonly Data[] FormatAndParseData = {
 /*XXX*/            new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = ".", Pattern = "%." }, // decimal separator
             new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = ":", Pattern = "%:" }, // date separator
-/*XXX*/            new Data(Offset.Zero) { Culture = Cultures.ItIt, Text = ".", Pattern = "%." }, // decimal separator (always period)
-            new Data(Offset.Zero) { Culture = Cultures.ItIt, Text = ".", Pattern = "%:" }, // date separator
+/*XXX*/            new Data(Offset.Zero) { Culture = Cultures.DotTimeSeparator, Text = ".", Pattern = "%." }, // decimal separator (always period)
+            new Data(Offset.Zero) { Culture = Cultures.DotTimeSeparator, Text = ".", Pattern = "%:" }, // date separator
             new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "H", Pattern = "\\H" },
             new Data(Offset.Zero) { Culture = Cultures.EnUs, Text = "HHss", Pattern = "'HHss'" },
             new Data(0, 0, 12) { Culture = Cultures.EnUs, Text = "12", Pattern = "%s" },
@@ -163,11 +162,11 @@ namespace NodaTime.Test.Text
             new Data(5, 12, 34) { Culture = Cultures.FrFr, Text = "+05:12:34", Pattern = "g" },
             new Data(Offset.MaxValue) { Culture = Cultures.FrFr, Text = "+18", Pattern = "g" },
             new Data(Offset.MinValue) { Culture = Cultures.FrFr, Text = "-18", Pattern = "g" },
-            new Data(5, 0, 0) { Culture = Cultures.ItIt, Text = "+05", Pattern = "g" },
-            new Data(5, 12, 0) { Culture = Cultures.ItIt, Text = "+05.12", Pattern = "g" },
-            new Data(5, 12, 34) { Culture = Cultures.ItIt, Text = "+05.12.34", Pattern = "g" },
-            new Data(Offset.MaxValue) { Culture = Cultures.ItIt, Text = "+18", Pattern = "g" },
-            new Data(Offset.MinValue) { Culture = Cultures.ItIt, Text = "-18", Pattern = "g" },
+            new Data(5, 0, 0) { Culture = Cultures.DotTimeSeparator, Text = "+05", Pattern = "g" },
+            new Data(5, 12, 0) { Culture = Cultures.DotTimeSeparator, Text = "+05.12", Pattern = "g" },
+            new Data(5, 12, 34) { Culture = Cultures.DotTimeSeparator, Text = "+05.12.34", Pattern = "g" },
+            new Data(Offset.MaxValue) { Culture = Cultures.DotTimeSeparator, Text = "+18", Pattern = "g" },
+            new Data(Offset.MinValue) { Culture = Cultures.DotTimeSeparator, Text = "-18", Pattern = "g" },
 
             // Standard patterns without punctuation
             new Data(5, 0, 0) { Culture = Cultures.EnUs, Text = "+05", Pattern = "I"  },
@@ -187,11 +186,11 @@ namespace NodaTime.Test.Text
             new Data(5, 12, 34) { Culture = Cultures.FrFr, Text = "+051234", Pattern = "i" },
             new Data(Offset.MaxValue) { Culture = Cultures.FrFr, Text = "+18", Pattern = "i" },
             new Data(Offset.MinValue) { Culture = Cultures.FrFr, Text = "-18", Pattern = "i" },
-            new Data(5, 0, 0) { Culture = Cultures.ItIt, Text = "+05", Pattern = "i" },
-            new Data(5, 12, 0) { Culture = Cultures.ItIt, Text = "+0512", Pattern = "i" },
-            new Data(5, 12, 34) { Culture = Cultures.ItIt, Text = "+051234", Pattern = "i" },
-            new Data(Offset.MaxValue) { Culture = Cultures.ItIt, Text = "+18", Pattern = "i" },
-            new Data(Offset.MinValue) { Culture = Cultures.ItIt, Text = "-18", Pattern = "i" },
+            new Data(5, 0, 0) { Culture = Cultures.DotTimeSeparator, Text = "+05", Pattern = "i" },
+            new Data(5, 12, 0) { Culture = Cultures.DotTimeSeparator, Text = "+0512", Pattern = "i" },
+            new Data(5, 12, 34) { Culture = Cultures.DotTimeSeparator, Text = "+051234", Pattern = "i" },
+            new Data(Offset.MaxValue) { Culture = Cultures.DotTimeSeparator, Text = "+18", Pattern = "i" },
+            new Data(Offset.MinValue) { Culture = Cultures.DotTimeSeparator, Text = "-18", Pattern = "i" },
 
             // Explicit patterns
             new Data(0, 30, 0, true) { Culture = Cultures.EnUs, Text = "-00:30", Pattern = "+HH:mm" },
@@ -215,11 +214,7 @@ namespace NodaTime.Test.Text
         }
 
         [Test]
-        [TestCaseSource(nameof(FormatData))]
-        public void AppendFormat(PatternTestData<Offset> data)
-        {
-            data.TestAppendFormat();
-        }
+        public void ParseNull() => AssertParseNull(OffsetPattern.GeneralInvariant);
 
         [Test]
         public void NumberFormatIgnored()
@@ -231,6 +226,17 @@ namespace NodaTime.Test.Text
 
             Assert.AreEqual("+05:00", pattern.Format(Offset.FromHours(5)));
             Assert.AreEqual("-05:00", pattern.Format(Offset.FromHours(-5)));
+        }
+
+        [Test]
+        public void CreateWithCurrentCulture()
+        {
+            using (CultureSaver.SetCultures(Cultures.DotTimeSeparator))
+            {
+                var pattern = OffsetPattern.CreateWithCurrentCulture("H:mm");
+                var text = pattern.Format(Offset.FromHoursAndMinutes(1, 30));
+                Assert.AreEqual("1.30", text);
+            }
         }
 
         /// <summary>

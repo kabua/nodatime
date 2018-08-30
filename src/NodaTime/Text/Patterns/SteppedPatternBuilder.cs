@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using NodaTime.Globalization;
-using NodaTime.Properties;
 using NodaTime.Utility;
 using JetBrains.Annotations;
 
@@ -71,8 +70,7 @@ namespace NodaTime.Text.Patterns
             // Now iterate over the pattern.
             while (patternCursor.MoveNext())
             {
-                CharacterHandler<TResult, TBucket> handler;
-                if (characterHandlers.TryGetValue(patternCursor.Current, out handler))
+                if (characterHandlers.TryGetValue(patternCursor.Current, out CharacterHandler<TResult, TBucket> handler))
                 {
                     handler(patternCursor, this);
                 }
@@ -80,9 +78,9 @@ namespace NodaTime.Text.Patterns
                 {
                     char current = patternCursor.Current;
                     if ((current >= 'A' && current <= 'Z') || (current >= 'a' && current <= 'z') ||
-                        current == PatternCursor.EmbeddedPatternStart || current == PatternCursor.EmbeddedPatternStart)
+                        current == PatternCursor.EmbeddedPatternStart || current == PatternCursor.EmbeddedPatternEnd)
                     {
-                        throw new InvalidPatternException(Messages.Parse_UnquotedLiteral, current);
+                        throw new InvalidPatternException(TextErrorMessages.UnquotedLiteral, current);
                     }
                     AddLiteral(patternCursor.Current, ParseResult<TResult>.MismatchedCharacter);
                 }
@@ -100,12 +98,12 @@ namespace NodaTime.Text.Patterns
 
             if ((usedFields & (PatternFields.Era | PatternFields.YearOfEra)) == PatternFields.Era)
             {
-                throw new InvalidPatternException(Messages.Parse_EraWithoutYearOfEra);
+                throw new InvalidPatternException(TextErrorMessages.EraWithoutYearOfEra);
             }
             const PatternFields calendarAndEra = PatternFields.Era | PatternFields.Calendar;
             if ((usedFields & calendarAndEra) == calendarAndEra)
             {
-                throw new InvalidPatternException(Messages.Parse_CalendarAndEra);
+                throw new InvalidPatternException(TextErrorMessages.CalendarAndEra);
             }
         }
 
@@ -120,20 +118,20 @@ namespace NodaTime.Text.Patterns
             if (usedFields.HasAny(PatternFields.EmbeddedDate) &&
                 usedFields.HasAny(PatternFields.AllDateFields & ~PatternFields.EmbeddedDate))
             {
-                throw new InvalidPatternException(Messages.Parse_DateFieldAndEmbeddedDate);
+                throw new InvalidPatternException(TextErrorMessages.DateFieldAndEmbeddedDate);
             }
             // Ditto for time
             if (usedFields.HasAny(PatternFields.EmbeddedTime) &&
                 usedFields.HasAny(PatternFields.AllTimeFields & ~PatternFields.EmbeddedTime))
             {
-                throw new InvalidPatternException(Messages.Parse_TimeFieldAndEmbeddedTime);
+                throw new InvalidPatternException(TextErrorMessages.TimeFieldAndEmbeddedTime);
             }
 
             Action<TResult, StringBuilder> formatDelegate = null;
             foreach (Action<TResult, StringBuilder> formatAction in formatActions)
             {
                 IPostPatternParseFormatAction postAction = formatAction.Target as IPostPatternParseFormatAction;
-                formatDelegate += postAction == null ? formatAction : postAction.BuildFormatAction(usedFields);
+                formatDelegate += postAction is null ? formatAction : postAction.BuildFormatAction(usedFields);
             }
             return new SteppedPattern(formatDelegate, formatOnly ? null : parseActions.ToArray(), bucketProvider, usedFields, sample);
         }
@@ -147,7 +145,7 @@ namespace NodaTime.Text.Patterns
             PatternFields newUsedFields = usedFields | field;
             if (newUsedFields == usedFields)
             {
-                throw new InvalidPatternException(Messages.Parse_RepeatedFieldInPattern, characterInPattern);
+                throw new InvalidPatternException(TextErrorMessages.RepeatedFieldInPattern, characterInPattern);
             }
             usedFields = newUsedFields;
         }
@@ -167,8 +165,7 @@ namespace NodaTime.Text.Patterns
             AddParseAction((cursor, bucket) =>
             {
                 int startingIndex = cursor.Index;
-                long value;
-                if (!cursor.ParseInt64Digits(minimumDigits, maximumDigits, out value))
+                if (!cursor.ParseInt64Digits(minimumDigits, maximumDigits, out long value))
                 {
                     cursor.Move(startingIndex);
                     return ParseResult<TResult>.MismatchedNumber(cursor, new string(patternChar, minimumDigits));
@@ -191,14 +188,13 @@ namespace NodaTime.Text.Patterns
             AddParseAction((cursor, bucket) =>
             {
                 int startingIndex = cursor.Index;
-                int value;
                 bool negative = cursor.Match('-');
                 if (negative && minimumValue >= 0)
                 {
                     cursor.Move(startingIndex);
                     return ParseResult<TResult>.UnexpectedNegative(cursor);
                 }
-                if (!cursor.ParseDigits(minimumDigits, maximumDigits, out value))
+                if (!cursor.ParseDigits(minimumDigits, maximumDigits, out int value))
                 {
                     cursor.Move(startingIndex);
                     return ParseResult<TResult>.MismatchedNumber(cursor, new string(patternChar, minimumDigits));
@@ -245,7 +241,7 @@ namespace NodaTime.Text.Patterns
         {
             if (!pattern.MoveNext())
             {
-                throw new InvalidPatternException(Messages.Parse_EscapeAtEndOfString);
+                throw new InvalidPatternException(TextErrorMessages.EscapeAtEndOfString);
             }
             builder.AddLiteral(pattern.Current, ParseResult<TResult>.EscapedCharacterMismatch);
         }
@@ -263,9 +259,9 @@ namespace NodaTime.Text.Patterns
                     // Handle the next character as normal
                     return;
                 }
-                throw new InvalidPatternException(Messages.Parse_PercentDoubled);
+                throw new InvalidPatternException(TextErrorMessages.PercentDoubled);
             }
-            throw new InvalidPatternException(Messages.Parse_PercentAtEndOfString);
+            throw new InvalidPatternException(TextErrorMessages.PercentAtEndOfString);
         }
 
         /// <summary>
@@ -352,7 +348,7 @@ namespace NodaTime.Text.Patterns
             for (int i = 0; i < values.Count; i++)
             {
                 string candidate = values[i];
-                if (candidate == null || candidate.Length <= longestMatch)
+                if (candidate is null || candidate.Length <= longestMatch)
                 {
                     continue;
                 }
@@ -472,66 +468,88 @@ namespace NodaTime.Text.Patterns
                 pattern.MoveNext();
             }
             string embeddedPatternText = pattern.GetEmbeddedPattern();
-            var sampleBucket = CreateSampleBucket();
-            var templateTime = timeBucketExtractor(sampleBucket).TemplateValue;
-            var templateDate = dateBucketExtractor(sampleBucket).TemplateValue;
             switch (patternType)
             {
                 case '<':
-                    if (dateTimeExtractor == null)
                     {
-                        throw new InvalidPatternException(Messages.Parse_InvalidEmbeddedPatternType);
+                        var sampleBucket = CreateSampleBucket();
+                        var templateTime = timeBucketExtractor(sampleBucket).TemplateValue;
+                        var templateDate = dateBucketExtractor(sampleBucket).TemplateValue;
+                        if (dateTimeExtractor is null)
+                        {
+                            throw new InvalidPatternException(TextErrorMessages.InvalidEmbeddedPatternType);
+                        }
+                        AddField(PatternFields.EmbeddedDate, 'l');
+                        AddField(PatternFields.EmbeddedTime, 'l');
+                        AddEmbeddedPattern(
+                            LocalDateTimePattern.Create(embeddedPatternText, FormatInfo, templateDate + templateTime).UnderlyingPattern,
+                            (bucket, value) =>
+                            {
+                                var dateBucket = dateBucketExtractor(bucket);
+                                var timeBucket = timeBucketExtractor(bucket);
+                                dateBucket.Calendar = value.Calendar;
+                                dateBucket.Year = value.Year;
+                                dateBucket.MonthOfYearNumeric = value.Month;
+                                dateBucket.DayOfMonth = value.Day;
+                                timeBucket.Hours24 = value.Hour;
+                                timeBucket.Minutes = value.Minute;
+                                timeBucket.Seconds = value.Second;
+                                timeBucket.FractionalSeconds = value.NanosecondOfSecond;
+                            },
+                            dateTimeExtractor);
+                        break;
                     }
-                    AddField(PatternFields.EmbeddedDate, 'l');
-                    AddField(PatternFields.EmbeddedTime, 'l');
-                    AddEmbeddedPattern(
-                        LocalDateTimePattern.Create(embeddedPatternText, FormatInfo, templateDate + templateTime).UnderlyingPattern,
-                        (bucket, value) =>
-                        {
-                            var dateBucket = dateBucketExtractor(bucket);
-                            var timeBucket = timeBucketExtractor(bucket);
-                            dateBucket.Calendar = value.Calendar;
-                            dateBucket.Year = value.Year;
-                            dateBucket.MonthOfYearNumeric = value.Month;
-                            dateBucket.DayOfMonth = value.Day;
-                            timeBucket.Hours24 = value.Hour;
-                            timeBucket.Minutes = value.Minute;
-                            timeBucket.Seconds = value.Second;
-                            timeBucket.FractionalSeconds = value.NanosecondOfSecond;
-                        },
-                        dateTimeExtractor);
-                    break;
                 case 'd':
-                    AddField(PatternFields.EmbeddedDate, 'l');
-                    AddEmbeddedPattern(
-                        LocalDatePattern.Create(embeddedPatternText, FormatInfo, templateDate).UnderlyingPattern,
-                        (bucket, value) =>
-                        {
-                            var dateBucket = dateBucketExtractor(bucket);
-                            dateBucket.Calendar = value.Calendar;
-                            dateBucket.Year = value.Year;
-                            dateBucket.MonthOfYearNumeric = value.Month;
-                            dateBucket.DayOfMonth = value.Day;
-                        },
-                        dateExtractor);
+                    AddEmbeddedDatePattern('l', embeddedPatternText, dateBucketExtractor, dateExtractor);
                     break;
                 case 't':
-                    AddField(PatternFields.EmbeddedTime, 'l');
-                    AddEmbeddedPattern(
-                        LocalTimePattern.Create(embeddedPatternText, FormatInfo, templateTime).UnderlyingPattern,
-                        (bucket, value) =>
-                        {
-                            var timeBucket = timeBucketExtractor(bucket);
-                            timeBucket.Hours24 = value.Hour;
-                            timeBucket.Minutes = value.Minute;
-                            timeBucket.Seconds = value.Second;
-                            timeBucket.FractionalSeconds = value.NanosecondOfSecond;
-                        },
-                        timeExtractor);
+                    AddEmbeddedTimePattern('l', embeddedPatternText, timeBucketExtractor, timeExtractor);
                     break;
                 default:
                     throw new InvalidOperationException("Bug in Noda Time: embedded pattern type wasn't date, time, or date+time");
             }
+        }
+
+        internal void AddEmbeddedDatePattern(
+            char characterInPattern,
+            string embeddedPatternText,
+            Func<TBucket, LocalDatePatternParser.LocalDateParseBucket> dateBucketExtractor,
+            Func<TResult, LocalDate> dateExtractor)
+        {
+            var templateDate = dateBucketExtractor(CreateSampleBucket()).TemplateValue;
+            AddField(PatternFields.EmbeddedDate, characterInPattern);
+            AddEmbeddedPattern(
+                LocalDatePattern.Create(embeddedPatternText, FormatInfo, templateDate).UnderlyingPattern,
+                (bucket, value) =>
+                {
+                    var dateBucket = dateBucketExtractor(bucket);
+                    dateBucket.Calendar = value.Calendar;
+                    dateBucket.Year = value.Year;
+                    dateBucket.MonthOfYearNumeric = value.Month;
+                    dateBucket.DayOfMonth = value.Day;
+                },
+                dateExtractor);
+        }
+
+        internal void AddEmbeddedTimePattern(
+            char characterInPattern,
+            string embeddedPatternText,
+            Func<TBucket, LocalTimePatternParser.LocalTimeParseBucket> timeBucketExtractor,
+            Func<TResult, LocalTime> timeExtractor)
+        {
+            var templateTime = timeBucketExtractor(CreateSampleBucket()).TemplateValue;
+            AddField(PatternFields.EmbeddedTime, characterInPattern);
+            AddEmbeddedPattern(
+                LocalTimePattern.Create(embeddedPatternText, FormatInfo, templateTime).UnderlyingPattern,
+                (bucket, value) =>
+                {
+                    var timeBucket = timeBucketExtractor(bucket);
+                    timeBucket.Hours24 = value.Hour;
+                    timeBucket.Minutes = value.Minute;
+                    timeBucket.Seconds = value.Second;
+                    timeBucket.FractionalSeconds = value.NanosecondOfSecond;
+                },
+                timeExtractor);
         }
 
         /// <summary>
@@ -593,11 +611,11 @@ namespace NodaTime.Text.Patterns
 
             public ParseResult<TResult> Parse(string text)
             {
-                if (parseActions == null)
+                if (parseActions is null)
                 {
                     return ParseResult<TResult>.FormatOnlyPattern;
                 }
-                if (text == null)
+                if (text is null)
                 {
                     return ParseResult<TResult>.ArgumentNull("text");
                 }

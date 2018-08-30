@@ -23,8 +23,8 @@ namespace NodaTime.Test.Fields
         [TestCase("23:59:59.000", 1000, "00:00:00.000", 1)]
         public void Add(string start, long units, string expectedEnd, int expectedExtraDays)
         {
-            var startTime = LocalTimePattern.ExtendedIsoPattern.Parse(start).Value;
-            var expectedEndTime = LocalTimePattern.ExtendedIsoPattern.Parse(expectedEnd).Value;
+            var startTime = LocalTimePattern.ExtendedIso.Parse(start).Value;
+            var expectedEndTime = LocalTimePattern.ExtendedIso.Parse(expectedEnd).Value;
 
             int extraDays = 0;
             Assert.AreEqual(expectedEndTime, SampleField.Add(startTime, units, ref extraDays));
@@ -32,15 +32,25 @@ namespace NodaTime.Test.Fields
         }
 
         [Test]
-        [TestCase("00:00:01.000", "00:00:00.000", 1000)]
-        [TestCase("23:59:59.000", "00:00:00.000", NodaConstants.MillisecondsPerDay - 1000)]
-        [TestCase("00:00:01.0000", "00:00:00.9999", 0)]
-        public void Subtract(string minuend, string subtrahend, long expected)
+        [TestCase(Duration.MaxDays * NodaConstants.HoursPerDay - 1, Description = "Using BigInteger")]
+        [TestCase(1, Description = "Using long")]
+        [TestCase(Duration.MinDays * NodaConstants.HoursPerDay + 1, Description = "Using BigInteger")]
+        [TestCase(-1, Description = "Using long")]
+        public void GetUnitsInDuration(int hours)
         {
-            var minuendTime = LocalTimePattern.ExtendedIsoPattern.Parse(minuend).Value;
-            var subtrahendTime = LocalTimePattern.ExtendedIsoPattern.Parse(subtrahend).Value;
-            Assert.AreEqual(expected, SampleField.Subtract(minuendTime, subtrahendTime));
-            Assert.AreEqual(-expected, SampleField.Subtract(subtrahendTime, minuendTime));
+            var duration = Duration.FromHours(hours) + Duration.FromMinutes(30 * Math.Sign(hours));
+            Assert.AreEqual(hours, TimePeriodField.Hours.GetUnitsInDuration(duration));
+        }
+
+        [Test]
+        [TestCase(Duration.MaxDays * NodaConstants.HoursPerDay - 1, Description = "Using BigInteger")]
+        [TestCase(1, Description = "Using long")]
+        [TestCase(Duration.MinDays * NodaConstants.HoursPerDay, Description = "Using BigInteger (negative)")]
+        [TestCase(-1, Description = "Using long (positive)")]
+        public void ToDuration(int hours)
+        {
+            var actual = TimePeriodField.Hours.ToDuration(hours);
+            Assert.AreEqual(Duration.FromHours(hours), actual);
         }
     }
 }

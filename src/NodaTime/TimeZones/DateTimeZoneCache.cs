@@ -3,6 +3,7 @@
 // as found in the LICENSE.txt file.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using JetBrains.Annotations;
@@ -26,19 +27,18 @@ namespace NodaTime.TimeZones
     [Immutable] // Public only; caches are naturally mutable internally.
     public sealed class DateTimeZoneCache : IDateTimeZoneProvider
     {
-        private readonly object accessLock = new object();
         private readonly IDateTimeZoneSource source;
-        private readonly IDictionary<string, DateTimeZone> timeZoneMap = new Dictionary<string, DateTimeZone>();
+        private readonly ConcurrentDictionary<string, DateTimeZone> timeZoneMap = new ConcurrentDictionary<string, DateTimeZone>();
 
         /// <summary>
         /// Gets the version ID of this provider. This is simply the <see cref="IDateTimeZoneSource.VersionId"/> returned by
         /// the underlying source.
         /// </summary>
         /// <value>The version ID of this provider.</value>
-        public string VersionId { get; }
+        [NotNull] public string VersionId { get; }
 
         /// <inheritdoc />
-        public ReadOnlyCollection<string> Ids { get; }
+        [NotNull] public ReadOnlyCollection<string> Ids { get; }
 
         /// <summary>
         /// Creates a provider backed by the given <see cref="IDateTimeZoneSource"/>.
@@ -54,12 +54,12 @@ namespace NodaTime.TimeZones
         {
             this.source = Preconditions.CheckNotNull(source, nameof(source));
             this.VersionId = source.VersionId;
-            if (VersionId == null)
+            if (VersionId is null)
             {
                 throw new InvalidDateTimeZoneSourceException("Source-returned version ID was null");
             }
             var providerIds = source.GetIds();
-            if (providerIds == null)
+            if (providerIds is null)
             {
                 throw new InvalidDateTimeZoneSourceException("Source-returned ID sequence was null");
             }
@@ -69,7 +69,7 @@ namespace NodaTime.TimeZones
             // Populate the dictionary with null values meaning "the ID is valid, we haven't fetched the zone yet".
             foreach (string id in Ids)
             {
-                if (id == null)
+                if (id is null)
                 {
                     throw new InvalidDateTimeZoneSourceException("Source-returned ID sequence contained a null reference");
                 }
@@ -78,59 +78,56 @@ namespace NodaTime.TimeZones
         }
 
         /// <inheritdoc />
+        [NotNull]
         public DateTimeZone GetSystemDefault()
         {
-            TimeZoneInfo bcl = TimeZoneInfo.Local;
-            string id = source.MapTimeZoneId(bcl);
-            if (id == null)
+            string id = source.GetSystemDefaultId();
+            if (id is null)
             {
-#if PCL
-                throw new DateTimeZoneNotFoundException("TimeZoneInfo name " + bcl.StandardName + " is unknown to source " + VersionId);
-#else
-                throw new DateTimeZoneNotFoundException("TimeZoneInfo ID " + bcl.Id + " is unknown to source " + VersionId);
-#endif
+                throw new DateTimeZoneNotFoundException($"System default time zone is unknown to source {VersionId}");
             }
             return this[id];
         }
 
         /// <inheritdoc />
-        public DateTimeZone GetZoneOrNull([NotNull] string id)
+        [CanBeNull] public DateTimeZone GetZoneOrNull([NotNull] string id)
         {
             Preconditions.CheckNotNull(id, nameof(id));
-            DateTimeZone fixedZone = FixedDateTimeZone.GetFixedZoneOrNull(id);
-            if (fixedZone != null)
+            return GetZoneFromSourceOrNull(id) ?? FixedDateTimeZone.GetFixedZoneOrNull(id);
+        }
+
+        private DateTimeZone GetZoneFromSourceOrNull(string id)
+        {
+            if (!timeZoneMap.TryGetValue(id, out DateTimeZone zone))
             {
-                return fixedZone;
+                return null;
             }
-            lock (accessLock)
+            // Ask the source for the zone. Multiple threads *may* do the same thing, but
+            // that's hidden from the user: only one thread will update the map, and
+            // all other threads will use that value.
+            if (zone is null)
             {
-                DateTimeZone zone;
-                if (!timeZoneMap.TryGetValue(id, out zone))
+                zone = source.ForId(id);
+                if (zone is null)
                 {
-                    return null;
+                    throw new InvalidDateTimeZoneSourceException(
+                        $"Time zone {id} is supported by source {VersionId} but not returned");
                 }
-                if (zone == null)
-                {
-                    zone = source.ForId(id);
-                    if (zone == null)
-                    {
-                        throw new InvalidDateTimeZoneSourceException("Time zone " + id + " is supported by source " + VersionId + " but not returned");
-                    }
-                    timeZoneMap[id] = zone;
-                }
-                return zone;
+                // 
+                return timeZoneMap.TryUpdate(id, zone, null) ? zone : timeZoneMap[id];
             }
+            return zone;
         }
 
         /// <inheritdoc />
-        public DateTimeZone this[string id]
+        [NotNull] public DateTimeZone this[[NotNull] string id]
         {
             get
             {
                 var zone = GetZoneOrNull(id);
-                if (zone == null)
+                if (zone is null)
                 {
-                    throw new DateTimeZoneNotFoundException("Time zone " + id + " is unknown to source " + VersionId);
+                    throw new DateTimeZoneNotFoundException($"Time zone {id} is unknown to source {VersionId}");
                 }
                 return zone;
             }

@@ -4,6 +4,7 @@
 
 using System;
 using NodaTime.Utility;
+using NodaTime.Annotations;
 
 namespace NodaTime.Extensions
 {
@@ -18,6 +19,6 @@ namespace NodaTime.Extensions
         /// <remarks>This is a convenience method which calls <see cref="BclConversions.ToDayOfWeek"/>.</remarks>        
         /// <param name="isoDayOfWeek">The <c>IsoDayOfWeek</c> to convert.</param>
         /// <returns>The <c>DayOfWeek</c> equivalent to <paramref name="isoDayOfWeek"/></returns>
-        public static DayOfWeek ToIsoDayOfWeek(this IsoDayOfWeek isoDayOfWeek) => BclConversions.ToDayOfWeek(isoDayOfWeek);
+        public static DayOfWeek ToDayOfWeek(this IsoDayOfWeek isoDayOfWeek) => BclConversions.ToDayOfWeek(isoDayOfWeek);
     }
 }

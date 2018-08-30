@@ -4,7 +4,6 @@
 
 using System.Collections.Generic;
 using NodaTime.Globalization;
-using NodaTime.Properties;
 using NodaTime.Text.Patterns;
 
 namespace NodaTime.Text
@@ -51,16 +50,16 @@ namespace NodaTime.Text
             // Nullity check is performed in LocalTimePattern.
             if (patternText.Length == 0)
             {
-                throw new InvalidPatternException(Messages.Parse_FormatStringEmpty);
+                throw new InvalidPatternException(TextErrorMessages.FormatStringEmpty);
             }
 
             if (patternText.Length == 1)
             {
                 char patternCharacter = patternText[0];
                 patternText = ExpandStandardFormatPattern(patternCharacter, formatInfo);
-                if (patternText == null)
+                if (patternText is null)
                 {
-                    throw new InvalidPatternException(Messages.Parse_UnknownStandardFormat, patternCharacter, typeof(LocalTime));
+                    throw new InvalidPatternException(TextErrorMessages.UnknownStandardFormat, patternCharacter, typeof(LocalTime));
                 }
             }
 
@@ -144,8 +143,7 @@ namespace NodaTime.Text
                 {
                     AmPm = TemplateValue.Hour / 12;
                 }
-                int hour;
-                ParseResult<LocalTime> failure = DetermineHour(usedFields, text, out hour);
+                ParseResult<LocalTime> failure = DetermineHour(usedFields, text, out int hour);
                 if (failure != null)
                 {
                     return failure;

@@ -7,10 +7,12 @@ using BenchmarkDotNet.Attributes;
 
 namespace NodaTime.Benchmarks.NodaTimeTests
 {
-    [Config(typeof(BenchmarkConfig))]
     public class InstantBenchmarks
     {
         private static readonly Instant Sample = Instant.FromUtc(2011, 8, 24, 12, 29, 30);
+        private static readonly long SampleUnixTimeSeconds = Sample.ToUnixTimeSeconds();
+        private static readonly long SampleUnixTimeMilliseconds = Sample.ToUnixTimeMilliseconds();
+        private static readonly long SampleUnixTimeTicks = Sample.ToUnixTimeTicks();
         private static readonly Offset SmallOffset = Offset.FromHours(1);
         private static readonly Offset LargePositiveOffset = Offset.FromHours(12);
         private static readonly Offset LargeNegativeOffset = Offset.FromHours(-13);
@@ -27,6 +29,29 @@ namespace NodaTime.Benchmarks.NodaTimeTests
 
         [Benchmark]
         public ZonedDateTime InZoneLondon() => Sample.InZone(London);
+
+#if !V1
+        [Benchmark]
+        public Instant FromUnixTimeSeconds() => Instant.FromUnixTimeSeconds(SampleUnixTimeSeconds);
+
+        [Benchmark]
+        public Instant FromUnixTimeMilliseconds() => Instant.FromUnixTimeMilliseconds(SampleUnixTimeMilliseconds);
+
+        [Benchmark]
+        public Instant FromUnixTimeTicks() => Instant.FromUnixTimeTicks(SampleUnixTimeTicks);
+
+        [Benchmark]
+        public Instant FromUnixTimeTicks_Negative() => Instant.FromUnixTimeTicks(-NodaConstants.TicksPerDay * 900);
+
+        [Benchmark]
+        public long ToUnixTimeSeconds() => Sample.ToUnixTimeSeconds();
+
+        [Benchmark]
+        public long ToUnixTimeMilliseconds() => Sample.ToUnixTimeMilliseconds();
+
+        [Benchmark]
+        public long ToUnixTimeTicks() => Sample.ToUnixTimeTicks();
+#endif
 
 #if !V1_0 && !V1_1
         [Benchmark]

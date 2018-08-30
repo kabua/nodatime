@@ -55,16 +55,14 @@ namespace NodaTime.Test.Text
         public void TryGetValue_Success()
         {
             ParseResult<int> result = ParseResult<int>.ForValue(5);
-            int actual;
-            Assert.IsTrue(result.TryGetValue(-1, out actual));
+            Assert.IsTrue(result.TryGetValue(-1, out int actual));
             Assert.AreEqual(5, actual);
         }
 
         [Test]
         public void TryGetValue_Failure()
         {
-            int actual;
-            Assert.IsFalse(FailureResult.TryGetValue(-1, out actual));
+            Assert.IsFalse(FailureResult.TryGetValue(-1, out int actual));
             Assert.AreEqual(-1, actual);
         }
 
@@ -95,6 +93,15 @@ namespace NodaTime.Test.Text
         {
             ParseResult<int> original = ParseResult<int>.ForValue(10);
             Assert.Throws<InvalidOperationException>(() => original.ConvertError<string>());            
+        }
+
+        [Test]
+        public void ForException()
+        {
+            Exception e = new Exception();
+            ParseResult<int> result = ParseResult<int>.ForException(() => e);
+            Assert.IsFalse(result.Success);
+            Assert.AreSame(e, result.Exception);
         }
     }
 }

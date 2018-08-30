@@ -1,21 +1,20 @@
 # See http://docs.travis-ci.com/user/languages/csharp/ for details
 
+# TODO: Test against Mono as well, using matrix.include
 language: csharp
-install:
-  - curl -sSL https://raw.githubusercontent.com/aspnet/Home/dev/dnvminstall.sh | sh && source ~/.dnx/dnvm/dnvm.sh && dnvm upgrade
+mono: none
+dotnet: 2.1.300
+dist: trusty
 
-# Explicitly build the two biggest projects separately; just dnx
-# test would work, but separating out the build step makes for
-# simpler diagnostics. We run the smaller test suites first, to
-# give earlier confirmation that they're working at all.
-# (NodaTime.Test can time out easily...)
-# Note that we don't currently run the TzdbCompiler tests, as that
-# fails on Mono in understandable ways - it's really designed to
-# run on Windows, given that it relies on Windows BCL TimeZoneInfo
-# to check mappings.
+# We need to install the .NET Core 1.0 runtime to run netcoreapp1.0
+# tests.
+addons:
+  apt:
+    sources:
+    - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-ubuntu-trusty-prod trusty main'
+      key_url: 'https://packages.microsoft.com/keys/microsoft.asc'
+    packages:
+    - dotnet-sharedframework-microsoft.netcore.app-1.0.5
+
 script:
-  - dnu restore
-  - dnu build src/NodaTime
-  - dnu build src/NodaTime.Test
-  - dnx -p src/NodaTime.Serialization.Test test
-  - dnx -p src/NodaTime.Test test "--where=cat != Slow && cat != Overflow"
+  - build/travis.sh

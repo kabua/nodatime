@@ -6,7 +6,6 @@ using BenchmarkDotNet.Attributes;
 
 namespace NodaTime.Benchmarks.NodaTimeTests
 {
-    [Config(typeof(BenchmarkConfig))]
     public class PacificZonedDateTimeBenchmarks
     {
         private static readonly DateTimeZone Pacific = DateTimeZoneProviders.Tzdb["America/Los_Angeles"];
@@ -26,7 +25,7 @@ namespace NodaTime.Benchmarks.NodaTimeTests
         public int DayOfMonth() => SampleZoned.Day;
 
         [Benchmark]
-        public IsoDayOfWeek IsoDayOfWeek() => SampleZoned.IsoDayOfWeek;
+        public IsoDayOfWeek DayOfWeek() => SampleZoned.DayOfWeek;
 
         [Benchmark]
         public int DayOfYear() => SampleZoned.DayOfYear;

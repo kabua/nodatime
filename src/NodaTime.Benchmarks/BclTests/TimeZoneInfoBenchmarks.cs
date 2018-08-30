@@ -3,12 +3,10 @@
 // as found in the LICENSE.txt file.
 
 using System;
-using System.ComponentModel;
 using BenchmarkDotNet.Attributes;
 
 namespace NodaTime.Benchmarks.BclTests
 {
-    [Config(typeof(BenchmarkConfig))]
     [Category("BCL")]
     public class TimeZoneInfoBenchmarks
     {

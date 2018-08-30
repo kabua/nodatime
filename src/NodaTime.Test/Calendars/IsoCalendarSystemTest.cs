@@ -26,13 +26,12 @@ namespace NodaTime.Test.Calendars
 
             Assert.AreEqual(1970, epoch.Year);
             Assert.AreEqual(1970, epoch.YearOfEra);
-            Assert.AreEqual(1970, RegularWeekYearRule.Iso.GetWeekYear(epoch.Date));
-            Assert.AreEqual(1, RegularWeekYearRule.Iso.GetWeekOfWeekYear(epoch.Date));
+            Assert.AreEqual(1970, WeekYearRules.Iso.GetWeekYear(epoch.Date));
+            Assert.AreEqual(1, WeekYearRules.Iso.GetWeekOfWeekYear(epoch.Date));
             Assert.AreEqual(1, epoch.Month);
             Assert.AreEqual(1, epoch.Day);
             Assert.AreEqual(1, epoch.DayOfYear);
-            Assert.AreEqual(IsoDayOfWeek.Thursday, epoch.IsoDayOfWeek);
-            Assert.AreEqual(4, epoch.DayOfWeek);
+            Assert.AreEqual(IsoDayOfWeek.Thursday, epoch.DayOfWeek);
             Assert.AreEqual(Era.Common, epoch.Era);
             Assert.AreEqual(0, epoch.Hour);
             Assert.AreEqual(0, epoch.Minute);
@@ -49,13 +48,12 @@ namespace NodaTime.Test.Calendars
 
             Assert.AreEqual(2009, now.Year);
             Assert.AreEqual(2009, now.YearOfEra);
-            Assert.AreEqual(2009, RegularWeekYearRule.Iso.GetWeekYear(now.Date));
-            Assert.AreEqual(48, RegularWeekYearRule.Iso.GetWeekOfWeekYear(now.Date));
+            Assert.AreEqual(2009, WeekYearRules.Iso.GetWeekYear(now.Date));
+            Assert.AreEqual(48, WeekYearRules.Iso.GetWeekOfWeekYear(now.Date));
             Assert.AreEqual(11, now.Month);
             Assert.AreEqual(27, now.Day);
             Assert.AreEqual(TimeOfGreatAchievement.DayOfYear, now.DayOfYear);
-            Assert.AreEqual(IsoDayOfWeek.Friday, now.IsoDayOfWeek);
-            Assert.AreEqual(5, now.DayOfWeek);
+            Assert.AreEqual(IsoDayOfWeek.Friday, now.DayOfWeek);
             Assert.AreEqual(Era.Common, now.Era);
             Assert.AreEqual(18, now.Hour);
             Assert.AreEqual(38, now.Minute);
@@ -72,18 +70,12 @@ namespace NodaTime.Test.Calendars
         [Test]
         public void ConstructLocalInstant_WithAllFields()
         {
-            LocalInstant localAchievement = new LocalDateTime(2009, 11, 27, 18, 38, 25, 345, 8765).ToLocalInstant();
+            LocalInstant localAchievement = new LocalDateTime(2009, 11, 27, 18, 38, 25, 345).PlusTicks(8765).ToLocalInstant();
             long bclTicks = (TimeOfGreatAchievement - UnixEpochDateTime).Ticks;
             int bclDays = (int) (bclTicks / NodaConstants.TicksPerDay);
             long bclTickOfDay = bclTicks % NodaConstants.TicksPerDay;
             Assert.AreEqual(bclDays, localAchievement.DaysSinceEpoch);
             Assert.AreEqual(bclTickOfDay, localAchievement.NanosecondOfDay / NodaConstants.NanosecondsPerTick);
-        }
-
-        [Test]
-        public void IsoCalendarUsesIsoDayOfWeek()
-        {
-            Assert.IsTrue(CalendarSystem.Iso.UsesIsoDayOfWeek);
         }
 
         [Test]

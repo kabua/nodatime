@@ -14,7 +14,7 @@ namespace NodaTime
     /// offset is). This class has been slimmed down considerably over time - it's used much less
     /// than it used to be... almost solely for time zones.
     /// </summary>
-    internal struct LocalInstant : IEquatable<LocalInstant>
+    internal readonly struct LocalInstant : IEquatable<LocalInstant>
     {
         public static readonly LocalInstant BeforeMinValue = new LocalInstant(Instant.BeforeMinValue.DaysSinceEpoch, deliberatelyInvalid: true);
         public static readonly LocalInstant AfterMaxValue = new LocalInstant(Instant.AfterMaxValue.DaysSinceEpoch, deliberatelyInvalid: true);
@@ -22,7 +22,7 @@ namespace NodaTime
         /// <summary>
         /// Elapsed time since the local 1970-01-01T00:00:00.
         /// </summary>
-        [ReadWriteForEfficiency] private Duration duration;
+        private readonly Duration duration;
 
         /// <summary>
         /// Constructor which should *only* be used to construct the invalid instances.
@@ -124,7 +124,7 @@ namespace NodaTime
                 return Instant.AfterMaxValue;
             }
             // Okay, do the arithmetic as a Duration, then check the result for overflow, effectively.
-            var asDuration = duration.PlusSmallNanoseconds(offset.Nanoseconds);
+            var asDuration = duration.MinusSmallNanoseconds(offset.Nanoseconds);
             if (asDuration.FloorDays < Instant.MinDays)
             {
                 return Instant.BeforeMinValue;

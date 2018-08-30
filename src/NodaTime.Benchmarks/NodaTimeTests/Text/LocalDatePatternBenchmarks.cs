@@ -2,14 +2,12 @@
 // Use of this source code is governed by the Apache License 2.0,
 // as found in the LICENSE.txt file.
 
-using System.ComponentModel;
 using System.Text;
 using BenchmarkDotNet.Attributes;
 using NodaTime.Text;
 
 namespace NodaTime.Benchmarks.NodaTimeTests.Text
 {
-    [Config(typeof(BenchmarkConfig))]
     [Category("Text")]
     public class LocalDatePatternBenchmarks
     {
@@ -24,7 +22,7 @@ namespace NodaTime.Benchmarks.NodaTimeTests.Text
         [Benchmark]
         public void FormatWithIso()
         {
-            LocalDatePattern.IsoPattern.Format(SampleLocalDate);
+            LocalDatePattern.Iso.Format(SampleLocalDate);
         }
 
 #if !V1
@@ -32,7 +30,7 @@ namespace NodaTime.Benchmarks.NodaTimeTests.Text
         public void AppendFormatWithIso()
         {
             builder.Clear();
-            LocalDatePattern.IsoPattern.AppendFormat(SampleLocalDate, builder);
+            LocalDatePattern.Iso.AppendFormat(SampleLocalDate, builder);
         }
 #endif
 

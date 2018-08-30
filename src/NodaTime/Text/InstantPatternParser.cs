@@ -2,14 +2,11 @@
 // Use of this source code is governed by the Apache License 2.0,
 // as found in the LICENSE.txt file.
 
-using System;
-using System.Globalization;
-using System.Text;
+using JetBrains.Annotations;
 using NodaTime.Globalization;
-using NodaTime.Properties;
 using NodaTime.Text.Patterns;
 using NodaTime.Utility;
-using JetBrains.Annotations;
+using System.Text;
 
 namespace NodaTime.Text
 {
@@ -33,7 +30,7 @@ namespace NodaTime.Text
             Preconditions.CheckNotNull(patternText, nameof(patternText));
             if (patternText.Length == 0)
             {
-                throw new InvalidPatternException(Messages.Parse_FormatStringEmpty);
+                throw new InvalidPatternException(TextErrorMessages.FormatStringEmpty);
             }
             if (patternText.Length == 1)
             {
@@ -43,7 +40,7 @@ namespace NodaTime.Text
                         patternText = GeneralPatternText;
                         break;
                     default:
-                        throw new InvalidPatternException(Messages.Parse_UnknownStandardFormat, patternText, typeof(Instant));
+                        throw new InvalidPatternException(TextErrorMessages.UnknownStandardFormat, patternText, typeof(Instant));
                 }
             }
 

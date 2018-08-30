@@ -1,82 +1,98 @@
-﻿using System;
-using System.Collections.Immutable;
-using System.IO;
-using System.Linq;
-using System.Web.Hosting;
-using System.Web.Mvc;
-using Minibench.Framework;
+﻿// Copyright 2017 The Noda Time Authors. All rights reserved.
+// Use of this source code is governed by the Apache License 2.0,
+// as found in the LICENSE.txt file.
+using Microsoft.AspNetCore.Mvc;
+using NodaTime.Benchmarks;
 using NodaTime.Web.Models;
-using NodaTime.Web.Storage;
+using NodaTime.Web.ViewModels;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace NodaTime.Web.Controllers
 {
     public class BenchmarksController : Controller
     {
-        private readonly BenchmarkRepository repository;
-        private readonly ImmutableList<SourceLogEntry> log;
+        private readonly IBenchmarkRepository repository;
 
-        public BenchmarksController(BenchmarkRepository repository, ImmutableList<SourceLogEntry> log)
+        public BenchmarksController(IBenchmarkRepository repository)
         {
             this.repository = repository;
-            this.log = log;
         }
 
-        // GET: /Benchmarks/
-        // or
-        // GET: /Benchmarks/Machines
-        public ActionResult Machines()
+        [Route("/benchmarks")]
+        public IActionResult Index() => View(repository.ListEnvironments());
+
+        [Route("/benchmarks/environments/{id}")]
+        public IActionResult ViewEnvironment(string id) => View(repository.GetEnvironment(id));
+
+        [Route("/benchmarks/runs/{runId}")]
+        public IActionResult ViewRun(string runId) => View(repository.GetRun(runId));
+
+        [Route("/benchmarks/types/{typeId}")]
+        public IActionResult ViewType(string typeId)
         {
-            var machines = repository.RunsByMachine.Select(g => g.Key).OrderBy(name => name).ToList();
-            return View(machines);
+            var type = repository.GetType(typeId);
+            var previousCommit = GetPreviousRun(type.Run)?.Commit;
+            return View((type, previousCommit));
         }
 
-        public ActionResult Machine(string machine)
+        // TODO: Revisit these URLs. They're not terribly nice. I tried using colons (e.g. /{typeId}:compareEnvironments)
+        // which also isn't great, but indicates it's somewhat less of a resource... it worked locally, but not on Azure.
+
+        [Route("/benchmarks/types/{typeId}/compareEnvironments")]
+        public IActionResult CompareTypesByEnvironment(string typeId)
         {
-            var runs = repository.RunsByMachine[machine];
-            ViewBag.Machine = machine;
-            return View(runs);
+            var left = repository.GetType(typeId);
+            var runs = repository.ListEnvironments()
+                .Select(e => e.Runs.FirstOrDefault(r => r.Commit == left.Run.Commit))
+                .Where(r => r != null && r != left.Run)
+                .Select(r => r.Types_.FirstOrDefault(t => t.FullTypeName == left.FullTypeName))
+                .ToList();
+            // Always make the selected run the first one.
+            runs.Insert(0, left);
+            return View(new CompareTypesByEnvironmentViewModel(runs));
         }
 
-        public ActionResult Diff(string machine, string left, string right)
+
+        [Route("/benchmarks/types/{leftTypeId}/compareWithCommit/{commit}")]
+        public IActionResult CompareTypesByCommit(string leftTypeId, string commit)
         {
-            var leftFile = repository.GetRun(machine, left);
-            var rightFile = repository.GetRun(machine, right);
-
-            return View(new BenchmarkDiff(leftFile, rightFile, log));
-        }
-
-
-        public ActionResult BenchmarkRun(string machine, string label)
-        {
-            BenchmarkRun run = null;
-            string nextLabel = null; // In descending label order, so earlier...
-            foreach (var candidate in repository.RunsByMachine[machine])
+            var leftType = repository.GetType(leftTypeId);
+            var environment = leftType.Environment;
+            var run = environment.Runs.FirstOrDefault(r => r.Commit == commit);
+            if (run == null)
             {
-                if (run != null)
-                {
-                    nextLabel = candidate.Label;
-                    break;
-                }
-                if (candidate.Label == label)
-                {
-                    run = candidate;
-                }
+                return NotFound();
             }
-            ImmutableList<SourceLogEntry> changes = null;
-            if (nextLabel != null)
+            var rightType = run.Types_.FirstOrDefault(t => t.FullTypeName == leftType.FullTypeName);
+            if (rightType == null)
             {
-                string earlierHash = BenchmarkRepository.HashForLabel(nextLabel);
-                string thisHash = BenchmarkRepository.HashForLabel(label);
-                changes = log.EntriesBetween(earlierHash, thisHash).ToImmutableList();
+                return NotFound();
             }
-            return View(new BenchmarkRunAndSourceLogs(run, changes));
+            return View(new CompareTypesByCommitViewModel(leftType, rightType));
         }
 
+        [Route("/benchmarks/benchmarks/{benchmarkId}")]
+        public IActionResult ViewBenchmark(string benchmarkId) => View(repository.GetBenchmark(benchmarkId));
 
-        public ActionResult MethodHistory(string machine, string method, bool full = false)
+        [Route("/benchmarks/benchmarks/{benchmarkId}/history")]
+        public IActionResult ViewBenchmarkHistory(string benchmarkId)
         {
-            var history = MethodHistoryModel.ForMachineMethod(repository, machine, method, full);
-            return View(history);
-        }
+            // Use the provided benchmark as the latest one to use
+            var latest = repository.GetBenchmark(benchmarkId);
+            var benchmarks =
+                from run in latest.Environment.Runs.SkipWhile(r => r != latest.Run)
+                from type in run.Types_ where type.FullTypeName == latest.Type.FullTypeName
+                from benchmark in type.Benchmarks where benchmark.Method == latest.Method
+                select benchmark;
+
+            return View(benchmarks.ToList());
+        }        
+
+        private BenchmarkRun GetPreviousRun(BenchmarkRun run) =>
+            repository.GetEnvironment(run.BenchmarkEnvironmentId).Runs
+                .SkipWhile(r => r.BenchmarkRunId != run.BenchmarkRunId)
+                .Skip(1)
+                .FirstOrDefault();            
     }
 }

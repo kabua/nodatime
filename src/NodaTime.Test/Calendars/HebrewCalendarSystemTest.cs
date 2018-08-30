@@ -1,11 +1,11 @@
 ﻿// Copyright 2014 The Noda Time Authors. All rights reserved.
 // Use of this source code is governed by the Apache License 2.0,
 // as found in the LICENSE.txt file.
+
 using NodaTime.Calendars;
 using NodaTime.Text;
 using NUnit.Framework;
 using System;
-using System.Globalization;
 using System.Linq;
 
 namespace NodaTime.Test.Calendars
@@ -20,7 +20,7 @@ namespace NodaTime.Test.Calendars
         [Test]
         public void IsLeapYear()
         {
-            var bcl = new HebrewCalendar();
+            var bcl = BclCalendars.Hebrew;
             var minYear = bcl.GetYear(bcl.MinSupportedDateTime);
             var maxYear = bcl.GetYear(bcl.MaxSupportedDateTime);
             var noda = CalendarSystem.HebrewCivil;
@@ -35,11 +35,11 @@ namespace NodaTime.Test.Calendars
         /// This tests every day for the BCL-supported Hebrew calendar range, testing various aspects of each date,
         /// using the civil month numbering.
         /// </summary>
-        [Test, Timeout(300000)] // Can take a long time under NCrunch.
+        [Test]
         [Category("Slow")]
         public void BclThroughHistory_Civil()
         {
-            Calendar bcl = new HebrewCalendar();
+            var bcl = BclCalendars.Hebrew;
             var noda = CalendarSystem.HebrewCivil;
 
             // The min supported date/time starts part way through the year
@@ -54,10 +54,10 @@ namespace NodaTime.Test.Calendars
         /// This tests every day for the BCL-supported Hebrew calendar range, testing various aspects of each date,
         /// using the scriptural month numbering.
         /// </summary>
-        [Test, Timeout(300000)] // Can take a long time under NCrunch.
+        [Test]
         public void BclThroughHistory_Scriptural()
         {
-            Calendar bcl = new HebrewCalendar();
+            var bcl = BclCalendars.Hebrew;
             var noda = CalendarSystem.HebrewScriptural;
 
             // The min supported date/time starts part way through the year
@@ -77,7 +77,7 @@ namespace NodaTime.Test.Calendars
                         "Year: {0}; Month: {1} (civil)", year, civilMonth);
                     for (int day = 1; day < bcl.GetDaysInMonth(year, civilMonth); day++)
                     {
-                        DateTime bclDate = new DateTime(year, civilMonth, day, bcl);
+                        DateTime bclDate = bcl.ToDateTime(year, civilMonth, day, 0, 0, 0, 0);
                         LocalDate nodaDate = new LocalDate(year, scripturalMonth, day, noda);
                         Assert.AreEqual(bclDate, nodaDate.AtMidnight().ToDateTimeUnspecified(), "{0}-{1}-{2}", year, scripturalMonth, day);
                         Assert.AreEqual(nodaDate, LocalDateTime.FromDateTime(bclDate, noda).Date);
@@ -210,6 +210,26 @@ namespace NodaTime.Test.Calendars
                                     .Sum(month => calculator.GetDaysInMonth(year, month));
                 Assert.AreEqual(sum, calculator.GetDaysInYear(year), "Days in {0}", year);
             }
+        }
+
+        [Test]
+        [TestCase("5502-01-01", "5503-01-01")]
+        [TestCase("5502-01-01", "5502-02-01", Description = "Months in same half of year")]
+        // This is the test that looks odd...
+        [TestCase("5502-12-01", "5502-02-01", Description = "Months in opposite half of year")]
+        [TestCase("5502-03-10", "5502-03-12")]
+        public void ScripturalCompare(string earlier, string later)
+        {
+            var pattern = LocalDatePattern.Iso.WithCalendar(CalendarSystem.HebrewScriptural);
+            var earlierDate = pattern.Parse(earlier).Value;
+            var laterDate = pattern.Parse(later).Value;
+            TestHelper.TestCompareToStruct(earlierDate, earlierDate, laterDate);
+        }
+
+        [Test]
+        public void ScripturalGetDaysFromStartOfYearToStartOfMonth_InvalidForCoverage()
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => HebrewScripturalCalculator.GetDaysFromStartOfYearToStartOfMonth(5502, 0));
         }
 
         // Cases used for adding months and differences between months.

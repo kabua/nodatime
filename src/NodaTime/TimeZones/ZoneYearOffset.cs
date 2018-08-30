@@ -4,7 +4,6 @@
 
 using System;
 using System.Globalization;
-using NodaTime.Calendars;
 using NodaTime.TimeZones.IO;
 using NodaTime.Utility;
 using JetBrains.Annotations;
@@ -138,11 +137,7 @@ namespace NodaTime.TimeZones
             if (failed)
             {
                 string range = allowNegated ? $"[{minimum}, {maximum}] or [{-maximum}, {-minimum}]" : $"[{minimum}, {maximum}]";
-#if PCL
-                throw new ArgumentOutOfRangeException(name, $"{name} is not in the valid range: {range}");
-#else
                 throw new ArgumentOutOfRangeException(name, value, $"{name} is not in the valid range: {range}");
-#endif
             }
         }
 
@@ -157,7 +152,7 @@ namespace NodaTime.TimeZones
         /// </returns>
         public bool Equals(ZoneYearOffset other)
         {
-            if (ReferenceEquals(null, other))
+            if (other is null)
             {
                 return false;
             }
@@ -178,8 +173,8 @@ namespace NodaTime.TimeZones
 
         public override string ToString() =>
             string.Format(CultureInfo.InvariantCulture,
-                "ZoneYearOffset[mode:{0} monthOfYear:{1} dayOfMonth:{2} advance:{3} timeOfDay:{4:r} addDay:{5}]",
-                Mode, monthOfYear, dayOfMonth, AdvanceDayOfWeek, TimeOfDay, addDay);
+                "ZoneYearOffset[mode:{0} monthOfYear:{1} dayOfMonth:{2} dayOfWeek:{3} advance:{4} timeOfDay:{5:r} addDay:{6}]",
+                Mode, monthOfYear, dayOfMonth, dayOfWeek, AdvanceDayOfWeek, TimeOfDay, addDay);
 
         /// <summary>
         /// Returns the occurrence of this rule within the given year, as a LocalInstant.
@@ -193,11 +188,11 @@ namespace NodaTime.TimeZones
                 int actualDayOfMonth = dayOfMonth > 0 ? dayOfMonth : CalendarSystem.Iso.GetDaysInMonth(year, monthOfYear) + dayOfMonth + 1;
                 if (monthOfYear == 2 && dayOfMonth == 29 && !CalendarSystem.Iso.IsLeapYear(year))
                 {
-                    // This mirrors zic.c. It's an odd rule, but...
-                    if (dayOfWeek == 0 || AdvanceDayOfWeek)
-                    {
-                        throw new InvalidOperationException("Requested transition for a ZoneYearOffset of February 29th in a non-leap year, not moving backwards to find a day-of-week");
-                    }
+                    // In zic.c, this would result in an error if dayOfWeek is 0 or AdvanceDayOfWeek is true.
+                    // However, it's very convenient to be able to ask any rule for its occurrence in any year.
+                    // We rely on genuine rules being well-written - and before releasing an nzd file we always
+                    // check that it's in line with zic anyway. Ignoring the brokenness is simpler than fixing
+                    // rules that are only in force for a single year.
                     actualDayOfMonth = 28; // We'll now look backwards for the right day-of-week.
                 }
                 LocalDate date = new LocalDate(year, monthOfYear, actualDayOfMonth);
@@ -205,7 +200,7 @@ namespace NodaTime.TimeZones
                 {
                     // Optimized "go to next or previous occurrence of day or week". Try to do as few comparisons
                     // as possible, and only fetch DayOfWeek once. (If we call Next or Previous, it will work it out again.)
-                    int currentDayOfWeek = date.DayOfWeek;
+                    int currentDayOfWeek = (int) date.DayOfWeek;
                     if (currentDayOfWeek != dayOfWeek)
                     {
                         int diff = dayOfWeek - currentDayOfWeek;

@@ -67,6 +67,41 @@ namespace NodaTime.Test
         }
 
         [Test]
+        public void BetweenLocalDateTimes_AcrossDays()
+        {
+            Period expected = Period.FromHours(23) + Period.FromMinutes(59);
+            Period actual = Period.Between(TestDateTime1, TestDateTime1.PlusDays(1).PlusMinutes(-1));
+            Assert.AreEqual(expected, actual);
+        }
+
+        [Test]
+        public void BetweenLocalDateTimes_AcrossDays_MinutesAndSeconds()
+        {
+            Period expected = Period.FromMinutes(24 * 60 - 1) + Period.FromSeconds(59);
+            Period actual = Period.Between(TestDateTime1, TestDateTime1.PlusDays(1).PlusSeconds(-1), PeriodUnits.Minutes | PeriodUnits.Seconds);
+            Assert.AreEqual(expected, actual);
+        }
+
+        [Test]
+        public void BetweenLocalDateTimes_NotInt64Representable()
+        {
+            LocalDateTime start = new LocalDateTime(-5000, 1, 1, 0, 1, 2, 123);
+            LocalDateTime end = new LocalDateTime(   9000, 1, 1, 1, 2, 3, 456);
+            Assert.False((end.ToLocalInstant().TimeSinceLocalEpoch - start.ToLocalInstant().TimeSinceLocalEpoch).IsInt64Representable);
+
+            Period expected = new PeriodBuilder
+            {
+                // 365.2425 * 14000 = 5113395
+                Hours = 5113395L * 24 + 1,
+                Minutes = 1,
+                Seconds = 1,
+                Milliseconds = 333
+            }.Build();
+            Period actual = Period.Between(start, end, PeriodUnits.AllTimeUnits);
+            Assert.AreEqual(expected, actual);
+        }
+
+        [Test]
         public void BetweenLocalDates_InvalidUnits()
         {
             Assert.Throws<ArgumentException>(() => Period.Between(TestDate1, TestDate2, 0));
@@ -75,6 +110,28 @@ namespace NodaTime.Test
             Assert.Throws<ArgumentException>(() => Period.Between(TestDate1, TestDate2, PeriodUnits.Years | PeriodUnits.Hours));
         }
 
+        [Test]
+        public void BetweenLocalDates_DifferentCalendarSystems_Throws()
+        {
+            LocalDate start = new LocalDate(2017, 11, 1, CalendarSystem.Coptic);
+            LocalDate end = new LocalDate(2017, 11, 5, CalendarSystem.Gregorian);    
+            Assert.Throws<ArgumentException>(() => Period.Between(start, end));
+        }
+
+        [Test]
+        [TestCase("2016-05-16", "2019-03-13", PeriodUnits.Years, 2)]
+        [TestCase("2016-05-16", "2017-07-13", PeriodUnits.Months, 13)]
+        [TestCase("2016-05-16", "2016-07-13", PeriodUnits.Weeks, 8)]
+        [TestCase("2016-05-16", "2016-07-13", PeriodUnits.Days, 58)]
+        public void BetweenLocalDates_SingleUnit(string startText, string endText, PeriodUnits units, int expectedValue)
+        {
+            var start = LocalDatePattern.Iso.Parse(startText).Value;
+            var end = LocalDatePattern.Iso.Parse(endText).Value;
+            var actual = Period.Between(start, end, units);
+            var expected = new PeriodBuilder { [units] = expectedValue }.Build();
+            Assert.AreEqual(expected, actual);
+        }
+                
         [Test]
         public void BetweenLocalDates_MovingForwardNoLeapYears_WithExactResults()
         {
@@ -215,7 +272,7 @@ namespace NodaTime.Test
         public void BetweenLocalTimes_InvalidUnits()
         {
             LocalTime t1 = new LocalTime(10, 0);
-            LocalTime t2 = new LocalTime(15, 30, 45, 20, 5);
+            LocalTime t2 = LocalTime.FromHourMinuteSecondMillisecondTick(15, 30, 45, 20, 5);
             Assert.Throws<ArgumentException>(() => Period.Between(t1, t2, 0));
             Assert.Throws<ArgumentException>(() => Period.Between(t1, t2, (PeriodUnits)(-1)));
             Assert.Throws<ArgumentException>(() => Period.Between(t1, t2, PeriodUnits.YearMonthDay));
@@ -223,10 +280,26 @@ namespace NodaTime.Test
         }
 
         [Test]
+        [TestCase("01:02:03", "05:00:00", PeriodUnits.Hours, 3)]
+        [TestCase("01:02:03", "03:00:00", PeriodUnits.Minutes, 117)]
+        [TestCase("01:02:03", "01:05:02", PeriodUnits.Seconds, 179)]
+        [TestCase("01:02:03", "01:02:04.1234", PeriodUnits.Milliseconds, 1123)]
+        [TestCase("01:02:03", "01:02:04.1234", PeriodUnits.Ticks, 11234000)]
+        [TestCase("01:02:03", "01:02:04.1234", PeriodUnits.Nanoseconds, 1123400000)]
+        public void BetweenLocalTimes_SingleUnit(string startText, string endText, PeriodUnits units, long expectedValue)
+        {
+            var start = LocalTimePattern.ExtendedIso.Parse(startText).Value;
+            var end = LocalTimePattern.ExtendedIso.Parse(endText).Value;
+            var actual = Period.Between(start, end, units);
+            var expected = new PeriodBuilder { [units] = expectedValue }.Build();
+            Assert.AreEqual(expected, actual);
+        }
+
+        [Test]
         public void BetweenLocalTimes_MovingForwards()
         {
             LocalTime t1 = new LocalTime(10, 0);
-            LocalTime t2 = new LocalTime(15, 30, 45, 20, 5);
+            LocalTime t2 = LocalTime.FromHourMinuteSecondMillisecondTick(15, 30, 45, 20, 5);
             Assert.AreEqual(Period.FromHours(5) + Period.FromMinutes(30) + Period.FromSeconds(45) +
                                Period.FromMilliseconds(20) + Period.FromTicks(5),
                                Period.Between(t1, t2));
@@ -235,7 +308,7 @@ namespace NodaTime.Test
         [Test]
         public void BetweenLocalTimes_MovingBackwards()
         {
-            LocalTime t1 = new LocalTime(15, 30, 45, 20, 5);
+            LocalTime t1 = LocalTime.FromHourMinuteSecondMillisecondTick(15, 30, 45, 20, 5);
             LocalTime t2 = new LocalTime(10, 0);
             Assert.AreEqual(Period.FromHours(-5) + Period.FromMinutes(-30) + Period.FromSeconds(-45) +
                                Period.FromMilliseconds(-20) + Period.FromTicks(-5),
@@ -543,7 +616,7 @@ namespace NodaTime.Test
         {
             var original = new PeriodBuilder { Milliseconds = 1, Ticks = 15000 }.Build();
             var normalized = original.Normalize();
-            var expected = new PeriodBuilder { Milliseconds = 2, Ticks = 5000 }.Build();
+            var expected = new PeriodBuilder { Milliseconds = 2, Ticks = 0, Nanoseconds = 500000 }.Build();
             Assert.AreEqual(expected, normalized);
         }
 
@@ -552,7 +625,7 @@ namespace NodaTime.Test
         {
             var original = new PeriodBuilder { Ticks = 1, Nanoseconds = 150 }.Build();
             var normalized = original.Normalize();
-            var expected = new PeriodBuilder { Ticks = 2, Nanoseconds = 50}.Build();
+            var expected = new PeriodBuilder { Nanoseconds = 250}.Build();
             Assert.AreEqual(expected, normalized);
         }
 
@@ -607,6 +680,13 @@ namespace NodaTime.Test
         }
 
         [Test]
+        public void Normalize_Overflow()
+        {
+            Period period = Period.FromHours(long.MaxValue);
+            Assert.Throws<OverflowException>(() => period.Normalize());
+        }
+
+        [Test]
         public void ToString_SingleUnit()
         {
             var period = Period.FromHours(5);
@@ -654,7 +734,7 @@ namespace NodaTime.Test
                 4 * NodaConstants.TicksPerMinute +
                 5 * NodaConstants.TicksPerSecond +
                 6 * NodaConstants.TicksPerMillisecond + 7,
-                period.ToDuration().Ticks);
+                period.ToDuration().BclCompatibleTicks);
         }
 
         [Test]
@@ -784,15 +864,22 @@ namespace NodaTime.Test
         [TestCaseSource(nameof(AllPeriodUnits))]
         public void Between_ExtremeValues(PeriodUnits units)
         {
-            // We can't use None, and Ticks/Nanoseconds will *correctly* overflow.
-            if (units == PeriodUnits.None || units == PeriodUnits.Ticks || units== PeriodUnits.Nanoseconds)
+            // We can't use None, and Nanoseconds will *correctly* overflow.
+            if (units == PeriodUnits.None || units == PeriodUnits.Nanoseconds)
             {
                 return;
             }
-            var iso = CalendarSystem.Iso;
-            var minValue = new LocalDateTime(iso.MinYear, 1, 1, 0, 0);
-            var maxValue = new LocalDateTime(iso.MaxYear, 12, 31, 23, 59, 59, 999, (int) (NodaConstants.TicksPerMillisecond - 1));
+            var minValue = LocalDate.MinIsoValue.At(LocalTime.MinValue);
+            var maxValue = LocalDate.MaxIsoValue.At(LocalTime.MaxValue);
             Period.Between(minValue, maxValue, units);
+        }
+
+        [Test]
+        public void Between_ExtremeValues_Overflow()
+        {
+            var minValue = LocalDate.MinIsoValue.At(LocalTime.MinValue);
+            var maxValue = LocalDate.MaxIsoValue.At(LocalTime.MaxValue);
+            Assert.Throws<OverflowException>(() => Period.Between(minValue, maxValue, PeriodUnits.Nanoseconds));
         }
 
         [Test]
@@ -802,12 +889,19 @@ namespace NodaTime.Test
         [TestCase("2014-01-01T16:00:00", "2014-01-03T08:00:00", PeriodUnits.Hours, 40, -40)]
         public void Between_LocalDateTime_AwkwardTimeOfDayWithSingleUnit(string startText, string endText, PeriodUnits units, int expectedForward, int expectedBackward)
         {
-            LocalDateTime start = LocalDateTimePattern.ExtendedIsoPattern.Parse(startText).Value;
-            LocalDateTime end = LocalDateTimePattern.ExtendedIsoPattern.Parse(endText).Value;
+            LocalDateTime start = LocalDateTimePattern.ExtendedIso.Parse(startText).Value;
+            LocalDateTime end = LocalDateTimePattern.ExtendedIso.Parse(endText).Value;
             Period forward = Period.Between(start, end, units);
             Assert.AreEqual(expectedForward, forward.ToBuilder()[units]);
             Period backward = Period.Between(end, start, units);
             Assert.AreEqual(expectedBackward, backward.ToBuilder()[units]);
+        }
+
+        [Test]
+        public void Between_LocalDateTime_SameValue()
+        {
+            LocalDateTime start = new LocalDateTime(2014, 1, 1, 16, 0, 0);
+            Assert.AreSame(Period.Zero, Period.Between(start, start));
         }
 
         [Test]
@@ -818,18 +912,29 @@ namespace NodaTime.Test
             Period actual = Period.Between(start, end, PeriodUnits.YearMonthDay | PeriodUnits.AllTimeUnits);
             Period expected = new PeriodBuilder { Years = 1, Months = 1, Days = 1, Hours = 16 }.Build();
             Assert.AreEqual(expected, actual);
+        }        
+
+        [Test]
+        public void FromNanoseconds()
+        {
+            var period = Period.FromNanoseconds(1234567890L);
+            Assert.AreEqual(1234567890L, period.Nanoseconds);
         }
 
         [Test]
-        public void BinaryRoundTrip()
+        public void AddPeriodToPeriod_NoOverflow()
         {
-            TestHelper.AssertBinaryRoundtrip(Period.Zero);
-            // Check each field is distinct
-            TestHelper.AssertBinaryRoundtrip(new Period(1, 2, 3, 4, 5L, 6L, 7L, 8L, 9L, 10L));
-            // Check we're not truncating to Int32... (except for date values)
-            TestHelper.AssertBinaryRoundtrip(new Period(int.MaxValue, int.MaxValue, int.MinValue, int.MinValue, long.MaxValue,
-                                                        long.MinValue, long.MinValue, long.MinValue, long.MinValue,
-                                                        long.MinValue));
+            Period p1 = Period.FromHours(long.MaxValue);
+            Period p2 = Period.FromMinutes(60);
+            Assert.AreEqual(new PeriodBuilder { Hours = long.MaxValue, Minutes = 60 }.Build(), p1 + p2);
+        }
+
+        [Test]
+        public void AddPeriodToPeriod_Overflow()
+        {
+            Period p1 = Period.FromHours(long.MaxValue);
+            Period p2 = Period.FromHours(1);
+            Assert.Throws<OverflowException>(() => (p1 + p2).GetHashCode());
         }
 
         /// <summary>
@@ -837,7 +942,7 @@ namespace NodaTime.Test
         /// </summary>
         private static Period Parse(string text)
         {
-            return PeriodPattern.RoundtripPattern.Parse(text).Value;
+            return PeriodPattern.Roundtrip.Parse(text).Value;
         }
     }
 }

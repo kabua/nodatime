@@ -5,7 +5,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Threading;
 using NodaTime.Calendars;
 using NodaTime.Globalization;
 using NodaTime.Test.Text;
@@ -15,18 +14,8 @@ namespace NodaTime.Test.Globalization
 {
     public class NodaFormatInfoTest
     {
-        private readonly CultureInfo enUs = CultureInfo.GetCultureInfo("en-US");
-        private readonly CultureInfo enGb = CultureInfo.GetCultureInfo("en-GB");
-
-        private sealed class EmptyFormatProvider : IFormatProvider
-        {
-            #region IFormatProvider Members
-            public object GetFormat(Type formatType)
-            {
-                return null;
-            }
-            #endregion
-        }
+        private static readonly CultureInfo enUs = CultureInfo.GetCultureInfo("en-US");
+        private static readonly CultureInfo enGb = CultureInfo.GetCultureInfo("en-GB");
 
         // Just check we can actually build a NodaFormatInfo for every culture, outside
         // text-specific tests.
@@ -55,7 +44,9 @@ namespace NodaTime.Test.Globalization
             var original = new CultureInfo("en-US");
             var clone = (CultureInfo) original.Clone();
             Assert.AreEqual(original.Name, clone.Name);
-            clone.DateTimeFormat.DateSeparator = "@@@";
+            var dayNames = clone.DateTimeFormat.DayNames;
+            dayNames[1] = "@@@";
+            clone.DateTimeFormat.DayNames = dayNames;
 
             // Fool Noda Time into believing both are read-only, so it can use a cache...
             original = CultureInfo.ReadOnly(original);
@@ -63,8 +54,10 @@ namespace NodaTime.Test.Globalization
 
             var nodaOriginal = NodaFormatInfo.GetFormatInfo(original);
             var nodaClone = NodaFormatInfo.GetFormatInfo(clone);
-            Assert.AreEqual(original.DateTimeFormat.DateSeparator, nodaOriginal.DateSeparator);
-            Assert.AreEqual(clone.DateTimeFormat.DateSeparator, nodaClone.DateSeparator);
+            Assert.AreEqual(original.DateTimeFormat.DayNames[1], nodaOriginal.LongDayNames[1]);
+            Assert.AreEqual(clone.DateTimeFormat.DayNames[1], nodaClone.LongDayNames[1]);
+            // Just check we made a difference...
+            Assert.AreNotEqual(nodaOriginal.LongDayNames[1], nodaClone.LongDayNames[1]);
         }
 
         [Test]
@@ -128,14 +121,21 @@ namespace NodaTime.Test.Globalization
         }
 
         [Test]
-        public void TestGetInstance_IFormatProvider()
+        public void TestGetInstance_UnusableType()
+        {
+            NodaFormatInfo.ClearCache();
+            Assert.Throws<ArgumentException>(() => NodaFormatInfo.GetInstance(CultureInfo.InvariantCulture.NumberFormat));
+        }
+
+        [Test]
+        public void TestGetInstance_DateTimeFormatInfo()
         {
             NodaFormatInfo.ClearCache();
             using (CultureSaver.SetCultures(enUs, FailingCultureInfo.Instance))
             {
-                var provider = new EmptyFormatProvider();
-                var actual = NodaFormatInfo.GetInstance(provider);
-                Assert.AreSame(enUs, actual.CultureInfo);
+                var info = NodaFormatInfo.GetInstance(enGb.DateTimeFormat);
+                Assert.AreEqual(enGb.DateTimeFormat, info.DateTimeFormat);
+                Assert.AreEqual(CultureInfo.InvariantCulture, info.CultureInfo);
             }
         }
 
@@ -146,12 +146,12 @@ namespace NodaTime.Test.Globalization
             using (CultureSaver.SetCultures(enUs, FailingCultureInfo.Instance))
             {
                 var info = NodaFormatInfo.GetInstance(null);
-                Assert.AreEqual(Thread.CurrentThread.CurrentCulture, info.CultureInfo);
+                Assert.AreEqual(CultureInfo.CurrentCulture, info.CultureInfo);
             }
             using (CultureSaver.SetCultures(enGb, FailingCultureInfo.Instance))
             {
                 var info = NodaFormatInfo.GetInstance(null);
-                Assert.AreEqual(Thread.CurrentThread.CurrentCulture, info.CultureInfo);
+                Assert.AreEqual(CultureInfo.CurrentCulture, info.CultureInfo);
             }
         }
 
@@ -220,6 +220,18 @@ namespace NodaTime.Test.Globalization
         {
             var info = NodaFormatInfo.GetFormatInfo(enUs);
             Assert.Throws<ArgumentNullException>(() => info.GetEraPrimaryName(null));
+        }
+
+        [Test]
+        public void TestIntegerGenitiveMonthNames()
+        {
+            // Emulate behavior of Mono 3.0.6
+            var culture = (CultureInfo) CultureInfo.InvariantCulture.Clone();
+            culture.DateTimeFormat.MonthGenitiveNames = new[] { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12" };
+            culture.DateTimeFormat.AbbreviatedMonthGenitiveNames = new[] { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12" };
+            var info = NodaFormatInfo.GetFormatInfo(culture);
+            CollectionAssert.AreEqual(info.LongMonthGenitiveNames, info.LongMonthNames);
+            CollectionAssert.AreEqual(info.ShortMonthGenitiveNames, info.ShortMonthNames);
         }
     }
 }
