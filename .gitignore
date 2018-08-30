@@ -69,3 +69,4 @@ nuget/**
 /src/**/*-*.csproj
 
 /docs
+src/.vs/
